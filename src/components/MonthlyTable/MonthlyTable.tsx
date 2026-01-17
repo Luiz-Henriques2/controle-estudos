@@ -221,9 +221,9 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
             return (
               <tr key={day} style={{ 
                 borderBottom: '4px solid #cbd5e1',
-                background: today ? '#fef3c7' : (day % 2 === 0 ? '#f8fafc' : 'white'),
+                background: today ? '#fef3c7' : (day % 2 === 0 ? '#e8edf1' : 'white'),
                 transition: 'background 0.2s',
-                boxShadow: index % 3 === 0 ? 'inset 0 1px 0 #e2e8f0' : 'none'
+                boxShadow: index % 3 === 0 ? 'inset 0 1px 0 #323334' : 'none'
               }}>
                 <td style={{ 
                   padding: '8px 6px',
@@ -246,11 +246,11 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
                   const dayOfWeek = new Date(year, month - 1, day).getDay();
                   const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
                   const currentDay = dayNames[dayOfWeek];
-                  // Tenta usar alvo do dia da semana, senão usa alvo diário personalizado do dia, senão usa alvo padrão
                   const dailyTarget = weight.targetsByDay?.[currentDay] || entry?.targets?.[weight.name] || weight.target || 0;
                   const progress = dailyTarget > 0 ? (value / dailyTarget) * 100 : 0;
                   const progressCapped = Math.min(progress, 100);
                   const timeDisplay = decimalToTimeString(value);
+                  const targetDisplay = decimalToTimeString(dailyTarget);
                   
                   return (
                     <td key={weight.id || weight.name} style={{ 
@@ -261,9 +261,8 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
                       borderRight: '1px solid #e2e8f0',
                       position: 'relative'
                     }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        {/* Input de valor com +/- */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                           <button
                             onClick={() => {
                               const newValue = decrementTime(value);
@@ -273,21 +272,34 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
                               });
                             }}
                             style={{
-                              width: '18px',
-                              height: '18px',
+                              width: '20px',
+                              height: '20px',
                               padding: '0',
-                              border: `1px solid ${weight.color}60`,
-                              background: '#fff',
+                              border: 'none',
+                              background: 'transparent',
                               borderRadius: '3px',
                               cursor: 'pointer',
-                              fontSize: '11px',
+                              fontSize: '13px',
                               fontWeight: 'bold',
                               color: weight.color,
-                              flex: '0 0 auto'
+                              opacity: '0.4',
+                              transition: 'opacity 0.2s, background 0.2s',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.opacity = '1';
+                              e.currentTarget.style.background = `${weight.color}20`;
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.opacity = '0.4';
+                              e.currentTarget.style.background = 'transparent';
                             }}
                           >
                             −
                           </button>
+                          
                           <input
                             type="text"
                             value={timeDisplay}
@@ -304,17 +316,18 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
                             placeholder="-"
                             style={{
                               width: '42px',
-                              padding: '3px 4px',
-                              border: `1px solid ${weight.color}60`,
+                              padding: '4px 6px',
+                              border: 'none',
                               borderRadius: '3px',
-                              background: '#fff',
+                              background: 'transparent',
                               textAlign: 'center',
                               fontSize: '12px',
-                              fontWeight: '600',
-                              color: value > 0 ? weight.color : '#999',
-                              flex: '1'
+                              fontWeight: '700',
+                              color: value > 0 ? weight.color : '#d1d5db',
+                              transition: 'all 0.2s'
                             }}
                           />
+                          
                           <button
                             onClick={() => {
                               const newValue = incrementTime(value);
@@ -324,31 +337,52 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
                               });
                             }}
                             style={{
-                              width: '18px',
-                              height: '18px',
+                              width: '20px',
+                              height: '20px',
                               padding: '0',
-                              border: `1px solid ${weight.color}60`,
-                              background: '#fff',
+                              border: 'none',
+                              background: 'transparent',
                               borderRadius: '3px',
                               cursor: 'pointer',
-                              fontSize: '11px',
+                              fontSize: '13px',
                               fontWeight: 'bold',
                               color: weight.color,
-                              flex: '0 0 auto'
+                              opacity: '0.4',
+                              transition: 'opacity 0.2s, background 0.2s',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.opacity = '1';
+                              e.currentTarget.style.background = `${weight.color}20`;
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.opacity = '0.4';
+                              e.currentTarget.style.background = 'transparent';
                             }}
                           >
                             +
                           </button>
-                         {dailyTarget > 0 && (
-                            <div style={{ marginLeft: '6px', fontSize: '11px', color: '#9ca3af', alignSelf: 'center' }}>
-                              {decimalToTimeString(dailyTarget)}
-                            </div>
-                          )}
                         </div>
-                        
-                        {/* Barra de progresso mais fina */}
+
                         {dailyTarget > 0 && (
-                          <div style={{ width: '100%', height: '4px', background: '#e5e7eb', borderRadius: '2px', overflow: 'hidden', position: 'relative' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                            <span style={{
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              color: '#9ca3af'
+                            }}>
+                              {timeDisplay}
+                            </span>
+                            <span style={{ fontSize: '10px', color: '#d1d5db' }}>
+                              / {targetDisplay}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {dailyTarget > 0 && (
+                          <div style={{ width: '100%', height: '4px', background: '#e5e7eb', borderRadius: '2px', overflow: 'hidden' }}>
                             <div
                               style={{
                                 width: `${progressCapped}%`,
@@ -387,6 +421,127 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
               </tr>
             );
           })}
+          
+          {/* Linha de Totais */}
+          {(() => {
+            const monthlyHours: Record<string, number> = {};
+            const monthlyTargets: Record<string, number> = {};
+            let totalScore = 0;
+
+            // Somar todas as horas registradas e calcular totais
+            weights.forEach(weight => {
+              if (weight.hidden) return;
+              monthlyHours[weight.name] = 0;
+              
+              // Calcular total de horas registradas
+              monthlyData.entries.forEach((entry: any) => {
+                if (entry.activities[weight.name]) {
+                  monthlyHours[weight.name] += entry.activities[weight.name];
+                }
+              });
+              
+              // Calcular total de horas alvo (targetsByDay * dias)
+              const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+              let targetSum = 0;
+              for (let d = 1; d <= daysInMonth; d++) {
+                const dow = new Date(year, month - 1, d).getDay();
+                const dayKey = dayNames[dow];
+                const plannedForDay = weight.targetsByDay && weight.targetsByDay[dayKey] !== undefined
+                  ? weight.targetsByDay[dayKey]
+                  : (weight.target || 0);
+                targetSum += plannedForDay;
+              }
+              monthlyTargets[weight.name] = targetSum;
+            });
+
+            // Calcular pontuação total do mês
+            monthlyData.entries.forEach((entry: any) => {
+              const score = calculateDailyScore(entry.activities);
+              if (score) totalScore += score;
+            });
+
+            return (
+              <tr style={{
+                borderBottom: '4px solid #1f2937',
+                background: '#f3f4f6',
+                fontWeight: 'bold'
+              }}>
+                <td style={{
+                  padding: '10px 6px',
+                  textAlign: 'center',
+                  fontSize: '13px',
+                  color: '#1f2937',
+                  borderRight: '1px solid #e2e8f0'
+                }}>
+                  TOTAL
+                </td>
+
+                {weights.filter(w => !w.hidden).map(weight => {
+                  const total = monthlyHours[weight.name] || 0;
+                  const target = monthlyTargets[weight.name] || 0;
+                  const progress = target > 0 ? (total / target) * 100 : 0;
+                  const progressCapped = Math.min(progress, 100);
+                  const timeDisplay = decimalToTimeString(total);
+                  const targetDisplay = decimalToTimeString(target);
+
+                  return (
+                    <td key={`total-${weight.id || weight.name}`} style={{
+                      padding: '6px 3px',
+                      textAlign: 'center',
+                      background: `${weight.color}20`,
+                      borderLeft: `3px solid ${weight.color}`,
+                      borderRight: '1px solid #e2e8f0'
+                    }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                          <span style={{
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            color: weight.color
+                          }}>
+                            {timeDisplay}
+                          </span>
+                          <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+                            / {targetDisplay}
+                          </span>
+                        </div>
+
+                        {target > 0 && (
+                          <div style={{ width: '100%', height: '4px', background: '#e5e7eb', borderRadius: '2px', overflow: 'hidden' }}>
+                            <div
+                              style={{
+                                width: `${progressCapped}%`,
+                                height: '100%',
+                                background: progressCapped >= 100 ? '#10b981' : progressCapped >= 50 ? '#f59e0b' : '#ef4444',
+                                transition: 'width 0.2s ease'
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  );
+                })}
+
+                <td style={{
+                  padding: '10px 6px',
+                  textAlign: 'center',
+                  fontWeight: 'bold',
+                  background: '#ecfdf5',
+                  borderLeft: '3px solid #10b981',
+                  borderRight: '1px solid #e2e8f0'
+                }}>
+                  <div style={{
+                    fontSize: '15px',
+                    fontWeight: '700',
+                    color: totalScore >= daysInMonth * 1000 ? '#047857' : '#d97706'
+                  }}>
+                    {totalScore.toLocaleString('pt-BR')}
+                  </div>
+                </td>
+              </tr>
+            );
+          })()}
         </tbody>
       </table>
       
