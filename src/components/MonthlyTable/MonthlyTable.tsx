@@ -117,7 +117,7 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
       <div style={{ 
         textAlign: 'center', 
         padding: '60px 20px',
-        background: 'white'
+        background: 'white',overflow: 'auto', maxHeight: '80vh'
       }}>
         <div className="spinner" style={{ margin: '0 auto' }}></div>
         <p style={{ marginTop: '20px', color: '#666' }}>Carregando dados do mês...</p>
@@ -176,7 +176,7 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
   
   return (
     <div style={{ display: 'flex', justifyContent: 'center', padding: '0 15px' }}>
-      <div style={{ width: '100%', maxWidth: '700px', overflowX: 'auto', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+      <div style={{ width: '100%', maxWidth: '700px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
         <table style={{ 
           width: '100%', 
           borderCollapse: 'collapse',
@@ -184,7 +184,7 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
         }}>
         <thead>
           <tr style={{ background: '#f3f4f6', borderBottom: '2px solid #d1d5db' }}>
-            <th style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '700', fontSize: '12px', minWidth: '50px' }}>Dia</th>
+            <th style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '700', fontSize: '12px', minWidth: '50px', position: 'sticky', top: 0, zIndex: 999, background: '#f3f4f6', boxShadow: '0 2px 4px rgba(0,0,0,0.04)' }}>Dia</th>
             {weights.filter(w => !w.hidden).map(weight => (
               <th key={weight.id || weight.name} style={{ 
                 padding: '10px 4px',
@@ -192,7 +192,11 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
                 fontWeight: '700',
                 fontSize: '11px',
                 background: '#f9fafb',
-                borderLeft: `3px solid ${weight.color}`
+                borderLeft: `3px solid ${weight.color}`,
+                position: 'sticky',
+                top: 0,
+                zIndex: 999,
+                boxShadow: '0 2px 4px rgba(0,0,0,0.04)'
               }}>
                 <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '2px' }}>{weight.name}</div>
                 <div style={{ fontSize: '16px', letterSpacing: '1px' }}>
@@ -200,7 +204,7 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
                 </div>
               </th>
             ))}
-            <th style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '700', fontSize: '12px', background: '#ecfdf5', borderLeft: '3px solid #10b981' }}>Pontuação</th>
+            <th style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '700', fontSize: '12px', background: '#ecfdf5', borderLeft: '3px solid #10b981', position: 'sticky', top: 0, zIndex: 999, boxShadow: '0 2px 4px rgba(0,0,0,0.04)' }}>Pontuação</th>
           </tr>
         </thead>
         <tbody>
@@ -216,16 +220,18 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
             
             return (
               <tr key={day} style={{ 
-                borderBottom: '3px solid #d1d5db',
-                background: today ? '#fef3c7' : 'white',
-                transition: 'background 0.2s'
+                borderBottom: '4px solid #cbd5e1',
+                background: today ? '#fef3c7' : (day % 2 === 0 ? '#f8fafc' : 'white'),
+                transition: 'background 0.2s',
+                boxShadow: index % 3 === 0 ? 'inset 0 1px 0 #e2e8f0' : 'none'
               }}>
                 <td style={{ 
                   padding: '8px 6px',
                   textAlign: 'center',
                   fontWeight: today ? '700' : '500',
                   fontSize: '12px',
-                  color: today ? '#92400e' : '#374151'
+                  color: today ? '#92400e' : '#374151',
+                  borderRight: '1px solid #e2e8f0'
                 }}>
                   <div style={{ fontSize: today ? '14px' : '13px', fontWeight: 'bold' }}>
                     {day}
@@ -251,9 +257,11 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
                       padding: '6px 3px', 
                       textAlign: 'center',
                       background: `${weight.color}15`,
-                      borderLeft: `2px solid ${weight.color}`
+                      borderLeft: `3px solid ${weight.color}`,
+                      borderRight: '1px solid #e2e8f0',
+                      position: 'relative'
                     }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         {/* Input de valor com +/- */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1px' }}>
                           <button
@@ -331,6 +339,11 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
                           >
                             +
                           </button>
+                         {dailyTarget > 0 && (
+                            <div style={{ marginLeft: '6px', fontSize: '11px', color: '#9ca3af', alignSelf: 'center' }}>
+                              {decimalToTimeString(dailyTarget)}
+                            </div>
+                          )}
                         </div>
                         
                         {/* Barra de progresso mais fina */}
