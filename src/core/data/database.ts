@@ -7,130 +7,343 @@ import {
 } from '../models/types';
 
 export class StudyControlDB extends Dexie {
-  activityWeights!: Table<ActivityWeights, string>;
-  objectives!: Table<Objective, string>;
-  dailyEntries!: Table<DailyEntry, string>;
-  monthlyData!: Table<MonthlyData, string>;
+  activityWeights!: Table<ActivityWeights>;
+  objectives!: Table<Objective>;
+  dailyEntries!: Table<DailyEntry>;
+  monthlyData!: Table<MonthlyData>;
 
   constructor() {
     super('StudyControlDB');
     
-    this.version(1).stores({
-      activityWeights: 'id, order',
-      objectives: 'id, isActive',
-      dailyEntries: 'id, date',
-      monthlyData: '[year+month], year, month'
+    console.log('🔄 Inicializando banco de dados StudyControlDB...');
+    
+    // VERSÃO 6: Corrigindo problemas de chave primária
+    this.version(6).stores({
+      activityWeights: '++id, order',
+      objectives: '++id',
+      dailyEntries: '&id', // & significa chave primária, precisa ser ÚNICA
+      monthlyData: '&id'   // & significa chave primária, precisa ser ÚNICA
     });
     
-    // Inicializa com dados padrão
+    // Hook para popular dados iniciais
     this.on('populate', async () => {
+      console.log('📝 Populando banco com dados iniciais...');
       await this.initializeDefaultData();
     });
   }
   
-  private async initializeDefaultData() {
-    // Pesos padrão
-    const defaultWeights: ActivityWeights[] = [
-      { 
-        id: 'estudo', 
-        name: 'Estudo', 
-        weight: 1.6, 
-        color: '#3b82f6', 
-        order: 1 
-      },
-      { 
-        id: 'ingles', 
-        name: 'Inglês', 
-        weight: 1.3, 
-        color: '#10b981', 
-        order: 2 
-      },
-      { 
-        id: 'trabalho', 
-        name: 'Trabalho', 
-        weight: 0.7, 
-        color: '#8b5cf6', 
-        order: 3 
-      },
-      { 
-        id: 'acordar', 
-        name: 'Acordar', 
-        weight: 0.1, 
-        color: '#f59e0b', 
-        order: 4 
-      },
-    ];
-    
-    await this.activityWeights.bulkAdd(defaultWeights);
-    
-    // Objetivo padrão
-    const defaultObjective: Objective = {
-      id: 'objetivo-1',
-      name: 'Objetivo Principal',
-      weights: {
-        estudo: 1.6,
-        ingles: 1.3,
-        trabalho: 0.7,
-        acordar: 0.1
-      },
-      isActive: true,
-      createdAt: new Date()
-    };
-    
-    await this.objectives.add(defaultObjective);
+  async initialize(): Promise<void> {
+    try {
+      if (!this.isOpen()) {
+        await this.open();
+      }
+      
+      // Forçar upgrade para versão 6 se necessário
+      if (this.verno < 6) {
+        await this.open();
+      }
+      
+      // Verifica se tem dados
+      const weightsCount = await this.activityWeights.count();
+      const objectivesCount = await this.objectives.count();
+      
+      console.log(`📊 Banco inicializado. Pesos: ${weightsCount}, Objetivos: ${objectivesCount}`);
+      
+    } catch (error) {
+      console.error('❌ Erro ao inicializar banco:', error);
+      throw error;
+    }
+  }
+  
+  private async initializeDefaultData(): Promise<void> {
+    try {
+      console.log('📝 Adicionando dados padrão...');
+      
+      // 1. PESOS (3 atividades - SEM ACORDAR!)
+      const defaultWeights = [
+        { 
+          name: 'Estudo', 
+          weight: 1.6, 
+          color: '#3b82f6', 
+          order: 1 
+        },
+        { 
+          name: 'Inglês', 
+          weight: 1.3, 
+          color: '#10b981', 
+          order: 2 
+        },
+        { 
+          name: 'Trabalho', 
+          weight: 0.7, 
+          color: '#8b5cf6', 
+          order: 3 
+        }
+        // REMOVIDO ACORDAR
+      ];
+      
+      await this.activityWeights.bulkAdd(defaultWeights);
+      console.log(`✅ ${defaultWeights.length} pesos adicionados`);
+      
+      // 2. OBJETIVO - SEM ACORDAR!
+      const defaultObjective = {
+        name: 'Objetivo Principal',
+        weights: {
+          'Estudo': 1.6,
+          'Inglês': 1.3,
+          'Trabalho': 0.7
+        },
+        isActive: true,
+        createdAt: new Date()
+      };
+      
+      await this.objectives.add(defaultObjective);
+      console.log('✅ Objetivo padrão adicionado');
+      
+      console.log('🎉 Dados iniciais configurados com sucesso!');
+      
+    } catch (error) {
+      console.error('❌ Erro ao adicionar dados padrão:', error);
+    }
   }
   
   async getMonthlyData(year: number, month: number): Promise<MonthlyData> {
     const id = `${year}-${month.toString().padStart(2, '0')}`;
     
-    let monthlyData = await this.monthlyData.get(id);
+    console.log(`📅 Buscando mês: ${id} (${month}/${year})`);
     
-    if (!monthlyData) {
-      monthlyData = await this.createNewMonth(year, month);
+    try {
+      // Tenta pegar do banco
+      let monthlyData = await this.monthlyData.get(id);
+      
+      if (!monthlyData) {
+        console.log(`📝 Mês não encontrado, criando novo: ${id}`);
+        monthlyData = await this.createNewMonth(year, month);
+      } else {
+        console.log(`✅ Mês encontrado: ${id} com ${monthlyData.entries.length} entradas`);
+      }
+      
+      return monthlyData;
+      
+    } catch (error) {
+      console.error('❌ Erro grave ao buscar mês:', error);
+      // Retorna um mês vazio em caso de erro
+      return this.createEmptyMonth(year, month);
     }
-    
-    return monthlyData;
   }
   
   private async createNewMonth(year: number, month: number): Promise<MonthlyData> {
-    const daysInMonth = new Date(year, month, 0).getDate();
-    const now = new Date();
+    console.log(`🔨 CRIANDO NOVO MÊS: ${month}/${year}`);
     
+    // PASSO 1: Calcular número de dias
+    const daysInMonth = new Date(year, month, 0).getDate();
+    console.log(`📅 O mês ${month}/${year} tem ${daysInMonth} dias`);
+    
+    // PASSO 2: Criar as entradas diárias
+    const now = new Date();
     const entries: DailyEntry[] = [];
+    
+    console.log(`🔄 Criando ${daysInMonth} entradas diárias...`);
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month - 1, day);
+      const entryId = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+      
       entries.push({
-        id: `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`,
+        id: entryId,
         date,
         activities: {},
         updatedAt: now
       });
     }
     
-    const activeObjective = await this.objectives
-      .where('isActive')
-      .equals(true)
-      .first();
+    console.log(`✅ ${entries.length} entradas criadas`);
     
+    // PASSO 3: Pegar objetivo ativo
+    let activeObjective;
+    try {
+      const allObjectives = await this.objectives.toArray();
+      activeObjective = allObjectives.find(obj => obj.isActive === true);
+      console.log(`🎯 Objetivo ativo encontrado: ${activeObjective ? 'Sim' : 'Não'}`);
+    } catch (error) {
+      console.error('❌ Erro ao buscar objetivo ativo:', error);
+      activeObjective = null;
+    }
+    
+    // PASSO 4: Criar objeto MonthlyData
+    const monthlyId = `${year}-${month.toString().padStart(2, '0')}`;
     const monthlyData: MonthlyData = {
+      id: monthlyId,
       year,
       month,
       entries,
-      objectiveId: activeObjective?.id || 'objetivo-1',
+      objectiveId: activeObjective?.id ? String(activeObjective.id) : '1',
       metaHours: 100,
       metaPoints: 10000,
       createdAt: now,
       updatedAt: now
     };
     
-    await this.monthlyData.add(monthlyData);
+    // PASSO 5: Salvar no banco e salvar cada entrada individualmente
+    try {
+      await this.monthlyData.add(monthlyData);
+      console.log(`🎉 Mês ${monthlyId} salvo no banco com ${entries.length} dias!`);
+      
+      // Salvar cada entrada individualmente também
+      for (const entry of entries) {
+        await this.dailyEntries.put(entry);
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Erro ao salvar mês:', error);
+      // Se já existe, retorna o que já tem
+      if (error.name === 'ConstraintError') {
+        const existing = await this.monthlyData.get(monthlyId);
+        if (existing) {
+          console.log(`⚠️ Mês já existe, retornando existente`);
+          return existing;
+        }
+      }
+    }
+    
     return monthlyData;
   }
   
+  private createEmptyMonth(year: number, month: number): MonthlyData {
+    const now = new Date();
+    const monthlyId = `${year}-${month.toString().padStart(2, '0')}`;
+    
+    console.log(`⚠️ Criando mês vazio: ${monthlyId}`);
+    
+    return {
+      id: monthlyId,
+      year,
+      month,
+      entries: [],
+      objectiveId: '1',
+      metaHours: 100,
+      metaPoints: 10000,
+      createdAt: now,
+      updatedAt: now
+    };
+  }
+  
   async updateDailyEntry(entry: DailyEntry): Promise<void> {
-    entry.updatedAt = new Date();
-    await this.dailyEntries.put(entry);
+    try {
+      entry.updatedAt = new Date();
+      
+      // Salva na tabela dailyEntries (esta é a tabela principal para persistência)
+      await this.dailyEntries.put(entry);
+      console.log(`💾 Entrada salva na tabela dailyEntries: ${entry.id}`);
+      
+      // Também atualiza no monthlyData correspondente
+      const date = entry.date;
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      const monthlyId = `${year}-${month.toString().padStart(2, '0')}`;
+      
+      const monthlyData = await this.monthlyData.get(monthlyId);
+      if (monthlyData) {
+        const entryIndex = monthlyData.entries.findIndex(e => e.id === entry.id);
+        if (entryIndex !== -1) {
+          monthlyData.entries[entryIndex] = entry;
+        } else {
+          monthlyData.entries.push(entry);
+        }
+        monthlyData.updatedAt = new Date();
+        await this.monthlyData.put(monthlyData);
+        console.log(`💾 Entrada também atualizada no mês ${monthlyId}`);
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro ao salvar entrada:', error);
+      // Tenta novamente com um log mais detalhado
+      console.error('Detalhes da entrada:', entry);
+      throw error;
+    }
+  }
+  
+  async getWeights(): Promise<ActivityWeights[]> {
+    return await this.activityWeights.orderBy('order').toArray();
+  }
+  
+  async getActiveObjective(): Promise<Objective | undefined> {
+    try {
+      const allObjectives = await this.objectives.toArray();
+      return allObjectives.find(obj => obj.isActive === true);
+    } catch (error) {
+      console.error('❌ Erro ao buscar objetivo ativo:', error);
+      return undefined;
+    }
+  }
+  
+  // Método para carregar todas as entradas de um mês da tabela dailyEntries
+  async loadDailyEntriesForMonth(year: number, month: number): Promise<DailyEntry[]> {
+    const monthPrefix = `${year}-${month.toString().padStart(2, '0')}-`;
+    
+    try {
+      const allEntries = await this.dailyEntries.toArray();
+      const monthEntries = allEntries.filter(entry => 
+        entry.id.startsWith(monthPrefix)
+      );
+      
+      console.log(`📊 Carregadas ${monthEntries.length} entradas da tabela dailyEntries para ${monthPrefix}`);
+      return monthEntries;
+    } catch (error) {
+      console.error('❌ Erro ao carregar entradas:', error);
+      return [];
+    }
+  }
+  
+  async debugInfo(): Promise<any> {
+    try {
+      const weights = await this.activityWeights.toArray();
+      const objectives = await this.objectives.toArray();
+      const monthlyData = await this.monthlyData.toArray();
+      const dailyEntries = await this.dailyEntries.toArray();
+      
+      return {
+        version: 6,
+        weightsCount: weights.length,
+        objectivesCount: objectives.length,
+        monthlyDataCount: monthlyData.length,
+        dailyEntriesCount: dailyEntries.length,
+        weights: weights.map(w => ({ 
+          id: w.id, 
+          name: w.name, 
+          weight: w.weight,
+          color: w.color 
+        })),
+        objectives: objectives.map(o => ({ 
+          id: o.id, 
+          name: o.name, 
+          isActive: o.isActive 
+        })),
+        monthlyData: monthlyData.map(m => ({
+          id: m.id,
+          year: m.year,
+          month: m.month,
+          entries: m.entries.length,
+          firstEntries: m.entries.slice(0, 3).map(e => ({
+            id: e.id,
+            date: e.date?.toISOString()?.split('T')[0] || 'sem data',
+            activities: e.activities
+          }))
+        })),
+        dailyEntries: dailyEntries.slice(0, 5).map(e => ({
+          id: e.id,
+          date: e.date?.toISOString()?.split('T')[0] || 'sem data',
+          activities: e.activities
+        }))
+      };
+    } catch (error: any) {
+      return { error: error.message };
+    }
   }
 }
 
 export const db = new StudyControlDB();
+
+// Expor para debug
+if (typeof window !== 'undefined') {
+  (window as any).studyDB = db;
+}

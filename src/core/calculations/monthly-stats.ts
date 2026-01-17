@@ -9,50 +9,58 @@ export class MonthlyStatsCalculator {
     metaHours: number,
     metaPoints: number
   ): MonthlyStats {
-    // Soma de horas estudadas (equivalente a =SOMA(N131:N161))
-    const totalHours = this.calculateTotalHours(entries, weights);
+    // Ordena por data
+    const sortedEntries = [...entries].sort((a, b) => 
+      a.date.getTime() - b.date.getTime()
+    );
+
+    // 1. Soma de horas estudadas (=SOMA(N131:N161))
+    const totalHours = this.calculateTotalHours(sortedEntries, weights);
     
-    // Calcula todas as pontuações diárias
-    const dailyScores = entries.map(entry => 
+    // 2. Calcula todas as pontuações diárias
+    const dailyScores = sortedEntries.map(entry => 
       DailyScoreCalculator.calculate(entry, weights, objectiveWeights)
     );
     
-    // Pontuação total mensal (=SOMA(U131:U161))
+    // 3. Pontuação total mensal (=SOMA(U131:U161))
     const totalPoints = dailyScores.reduce((sum, result) => 
       sum + (result.score || 0), 0
     );
     
-    // Média diária de pontos (=MÉDIA(U131:U161))
-    const daysWithScore = dailyScores.filter(d => d.score != null).length;
-    const dailyAveragePoints = daysWithScore > 0 ? totalPoints / daysWithScore : 0;
+    // 4. Dias com dados
+    const daysWithData = dailyScores.filter(d => d.score != null).length;
     
-    // Percentual de objetivo (=N162/M162)
+    // 5. Média diária de pontos (=MÉDIA(U131:U161))
+    const dailyAveragePoints = daysWithData > 0 ? totalPoints / daysWithData : 0;
+    
+    // 6. Percentual de objetivo (=N162/M162)
     const objectivePercentage = metaHours > 0 ? totalHours / metaHours : 0;
     
-    // Percentual de pontuação (=U162/V162)
+    // 7. Percentual de pontuação (=U162/V162)
     const pointsPercentage = metaPoints > 0 ? totalPoints / metaPoints : 0;
     
-    // Falta para completar (=SE(V162>U162;U162-V162;"Completo"))
+    // 8. Falta para completar (=SE(V162>U162;U162-V162;"Completo"))
     const remainingToComplete = metaPoints > totalPoints 
-      ? metaPoints - totalPoints 
+      ? Math.round(metaPoints - totalPoints)
       : 'Completo';
     
-    // Sequências
-    const sequences = this.calculateSequences(entries, weights);
+    // 9. Sequências (dias consecutivos estudando)
+    const sequences = this.calculateSequences(sortedEntries, weights);
     
-    // Fórmula de acordar (=((9-T162)/2)*(S162/S163))
-    const wakeUpFormulaResult = this.calculateWakeUpFormula(entries);
+    // 10. Fórmula de acordar (=((9-T162)/2)*(S162/S163))
+    const wakeUpFormulaResult = this.calculateWakeUpFormula(sortedEntries);
     
     return {
-      totalHours,
+      totalHours: Math.round(totalHours * 10) / 10,
       totalPoints,
-      dailyAveragePoints,
-      objectivePercentage,
-      pointsPercentage,
+      dailyAveragePoints: Math.round(dailyAveragePoints * 10) / 10,
+      objectivePercentage: Math.round(objectivePercentage * 100) / 100,
+      pointsPercentage: Math.round(pointsPercentage * 100) / 100,
       currentStreak: sequences.currentStreak,
       longestStreak: sequences.longestStreak,
       remainingToComplete,
-      wakeUpFormulaResult
+      wakeUpFormulaResult: Math.round(wakeUpFormulaResult * 100) / 100,
+      daysWithData
     };
   }
   
@@ -61,9 +69,10 @@ export class MonthlyStatsCalculator {
     weights: ActivityWeights[]
   ): number {
     return entries.reduce((total, entry) => {
-      return total + weights.reduce((sum, weight) => {
+      const dayHours = weights.reduce((sum, weight) => {
         return sum + (entry.activities[weight.id] || 0);
       }, 0);
+      return total + dayHours;
     }, 0);
   }
   
@@ -71,16 +80,11 @@ export class MonthlyStatsCalculator {
     entries: DailyEntry[],
     weights: ActivityWeights[]
   ): { currentStreak: number; longestStreak: number } {
-    // Ordena por data
-    const sortedEntries = [...entries].sort((a, b) => 
-      a.date.getTime() - b.date.getTime()
-    );
-    
     let currentStreak = 0;
     let longestStreak = 0;
     let tempStreak = 0;
     
-    for (const entry of sortedEntries) {
+    for (const entry of entries) {
       const hasStudyHours = weights.some(w => 
         (entry.activities[w.id] || 0) > 0
       );

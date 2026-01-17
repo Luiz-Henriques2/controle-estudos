@@ -1,7 +1,5 @@
 import React, { useMemo } from 'react';
 import { useMonthlyData } from '../../hooks/useMonthlyData';
-import { InputField } from '../UI/InputField';
-import { DateUtils } from '../../core/utils/date-utils';
 
 interface MonthlyTableProps {
   year: number;
@@ -13,157 +11,274 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
     monthlyData,
     weights,
     updateDailyEntry,
-    calculateDailyScore,
-    loading
+    loading,
+    error
   } = useMonthlyData(year, month);
   
   const daysInMonth = useMemo(() => {
-    return DateUtils.getDaysInMonth(year, month);
+    return new Date(year, month, 0).getDate();
   }, [year, month]);
   
-  if (loading || !monthlyData) {
+  const getDayName = (day: number) => {
+    const date = new Date(year, month - 1, day);
+    const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    return days[date.getDay()];
+  };
+  
+  const isToday = (day: number) => {
+    const today = new Date();
+    return day === today.getDate() && 
+           month === today.getMonth() + 1 && 
+           year === today.getFullYear();
+  };
+  
+  // Função simples para calcular pontuação
+  const calculateSimpleScore = (activities: Record<string, number>) => {
+    let total = 0;
+    Object.entries(activities).forEach(([name, hours]) => {
+      const weight = weights.find(w => w.name === name)?.weight || 1;
+      total += hours * weight;
+    });
+    return Math.round(total * 100);
+  };
+  
+  if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      <div style={{ 
+        textAlign: 'center', 
+        padding: '60px 20px',
+        background: 'white'
+      }}>
+        <div className="spinner" style={{ margin: '0 auto' }}></div>
+        <p style={{ marginTop: '20px', color: '#666' }}>Carregando dados do mês...</p>
       </div>
     );
   }
   
+  if (error) {
+    return (
+      <div style={{ 
+        padding: '40px', 
+        background: '#fee', 
+        textAlign: 'center'
+      }}>
+        <p style={{ color: '#c00', fontSize: '16px' }}>⚠️ {error}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          style={{ 
+            padding: '10px 20px', 
+            marginTop: '15px',
+            background: '#dc3545',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          Recarregar Página
+        </button>
+      </div>
+    );
+  }
+  
+  if (!monthlyData || weights.length === 0) {
+    return (
+      <div style={{ 
+        textAlign: 'center', 
+        padding: '60px 20px',
+        background: 'white'
+      }}>
+        <p style={{ color: '#666', fontSize: '16px' }}>⚠️ Nenhum dado disponível para este mês.</p>
+        <p style={{ color: '#999', marginTop: '10px' }}>
+          Banco: {monthlyData ? 'Carregado' : 'Não carregado'}, 
+          Pesos: {weights.length}
+        </p>
+      </div>
+    );
+  }
+  
+  console.log('📊 Tabela renderizando com:', {
+    diasNoMes: daysInMonth,
+    entradas: monthlyData.entries.length,
+    pesos: weights.length,
+    primeirasEntradas: monthlyData.entries.slice(0, 3)
+  });
+  
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Dia
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ 
+        width: '100%', 
+        borderCollapse: 'collapse',
+        background: 'white'
+      }}>
+        <thead>
+          <tr style={{ background: '#f8f9fa' }}>
+            <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600' }}>Dia</th>
+            {weights.map(weight => (
+              <th key={weight.id || weight.name} style={{ padding: '12px', textAlign: 'center', fontWeight: '600' }}>
+                <div>{weight.name}</div>
+                <div style={{ fontSize: '11px', color: '#666', fontWeight: 'normal' }}>
+                  peso: {weight.weight}
+                </div>
               </th>
-              
-              {weights.map(weight => (
-                <th 
-                  key={weight.id} 
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  style={{ color: weight.color }}
-                >
-                  {weight.name}
-                  <div className="text-xs font-normal">peso: {weight.weight}</div>
-                </th>
-              ))}
-              
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Dormir
-              </th>
-              
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Acordar
-              </th>
-              
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Bônus
-              </th>
-              
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Pontuação
-              </th>
-            </tr>
-          </thead>
-          
-          <tbody className="bg-white divide-y divide-gray-200">
-            {Array.from({ length: daysInMonth }, (_, index) => {
-              const day = index + 1;
-              const scoreResult = calculateDailyScore(day);
-              const isToday = day === DateUtils.getCurrentDate().day && 
-                              month === DateUtils.getCurrentDate().month && 
-                              year === DateUtils.getCurrentDate().year;
-              
-              return (
-                <tr 
-                  key={day} 
-                  className={`hover:bg-gray-50 ${isToday ? 'bg-blue-50' : ''}`}
-                >
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="flex flex-col items-center">
-                      <span className={`font-medium ${isToday ? 'text-blue-600' : 'text-gray-900'}`}>
-                        {day}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'][
-                          new Date(year, month - 1, day).getDay()
-                        ]}
-                      </span>
+            ))}
+            <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600' }}>Dormir</th>
+            <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600' }}>Acordar</th>
+            <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600' }}>Bônus</th>
+            <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600' }}>Pontuação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: daysInMonth }, (_, index) => {
+            const day = index + 1;
+            const entry = monthlyData.entries.find(e => {
+              if (!e.date) return false;
+              return e.date.getDate() === day;
+            });
+            
+            const today = isToday(day);
+            const score = entry ? calculateSimpleScore(entry.activities) : null;
+            
+            return (
+              <tr key={day} style={{ 
+                borderBottom: '1px solid #eee',
+                background: today ? '#e6f7ff' : 'white'
+              }}>
+                <td style={{ 
+                  padding: '12px',
+                  textAlign: 'center',
+                  fontWeight: today ? 'bold' : 'normal'
+                }}>
+                  <div style={{ fontSize: today ? '16px' : '14px' }}>
+                    {day}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#666', marginTop: '3px' }}>
+                    {getDayName(day)}
+                  </div>
+                </td>
+                
+                {weights.map(weight => {
+                  const value = entry?.activities[weight.name] || 0;
+                  
+                  return (
+                    <td key={weight.id || weight.name} style={{ padding: '10px', textAlign: 'center' }}>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={value}
+                        onChange={(e) => {
+                          const newValue = parseFloat(e.target.value) || 0;
+                          console.log(`Atualizando ${weight.name} dia ${day}: ${newValue}`);
+                          updateDailyEntry(day, {
+                            activityName: weight.name,
+                            activityValue: newValue
+                          });
+                        }}
+                        style={{
+                          width: '70px',
+                          padding: '8px',
+                          border: `2px solid ${weight.color}30`,
+                          borderRadius: '6px',
+                          background: '#f8f9fa',
+                          textAlign: 'center',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </td>
+                  );
+                })}
+                
+                <td style={{ padding: '10px', textAlign: 'center' }}>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={entry?.sleepTime || ''}
+                    onChange={(e) => updateDailyEntry(day, {
+                      sleepTime: e.target.value ? parseFloat(e.target.value) : undefined
+                    })}
+                    placeholder="--:--"
+                    style={{
+                      width: '70px',
+                      padding: '8px',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '6px',
+                      background: '#f8f9fa',
+                      textAlign: 'center',
+                      fontSize: '14px'
+                    }}
+                  />
+                </td>
+                
+                <td style={{ padding: '10px', textAlign: 'center' }}>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={entry?.wakeUpTime || ''}
+                    onChange={(e) => updateDailyEntry(day, {
+                      wakeUpTime: e.target.value ? parseFloat(e.target.value) : undefined
+                    })}
+                    placeholder="--:--"
+                    style={{
+                      width: '70px',
+                      padding: '8px',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '6px',
+                      background: '#f8f9fa',
+                      textAlign: 'center',
+                      fontSize: '14px'
+                    }}
+                  />
+                </td>
+                
+                <td style={{ padding: '10px', textAlign: 'center' }}>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={entry?.bonus || ''}
+                    onChange={(e) => updateDailyEntry(day, {
+                      bonus: e.target.value ? parseFloat(e.target.value) : undefined
+                    })}
+                    placeholder="0.0"
+                    style={{
+                      width: '70px',
+                      padding: '8px',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '6px',
+                      background: '#f8f9fa',
+                      textAlign: 'center',
+                      fontSize: '14px'
+                    }}
+                  />
+                </td>
+                
+                <td style={{ padding: '12px', textAlign: 'center', fontWeight: 'bold' }}>
+                  {score !== null && score > 0 ? (
+                    <div style={{ 
+                      fontSize: '16px',
+                      color: score >= 1000 ? '#10b981' : 
+                             score >= 500 ? '#f59e0b' : '#4a5568'
+                    }}>
+                      {score.toLocaleString('pt-BR')}
                     </div>
-                  </td>
-                  
-                  {weights.map(weight => {
-                    const entry = monthlyData.entries.find(e => e.date.getDate() === day);
-                    const value = entry?.activities[weight.id] || '';
-                    
-                    return (
-                      <td key={weight.id} className="px-4 py-3 whitespace-nowrap">
-                        <InputField
-                          value={value}
-                          onChange={(newValue) => updateDailyEntry(day, {
-                            activityId: weight.id,
-                            activityValue: newValue ? parseFloat(newValue) : 0
-                          })}
-                          placeholder="0.0"
-                        />
-                      </td>
-                    );
-                  })}
-                  
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <InputField
-                      value={monthlyData.entries.find(e => e.date.getDate() === day)?.sleepTime || ''}
-                      onChange={(newValue) => updateDailyEntry(day, {
-                        sleepTime: newValue ? parseFloat(newValue) : undefined
-                      })}
-                      placeholder="--:--"
-                    />
-                  </td>
-                  
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <InputField
-                      value={monthlyData.entries.find(e => e.date.getDate() === day)?.wakeUpTime || ''}
-                      onChange={(newValue) => updateDailyEntry(day, {
-                        wakeUpTime: newValue ? parseFloat(newValue) : undefined
-                      })}
-                      placeholder="--:--"
-                    />
-                  </td>
-                  
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <InputField
-                      value={monthlyData.entries.find(e => e.date.getDate() === day)?.bonus || ''}
-                      onChange={(newValue) => updateDailyEntry(day, {
-                        bonus: newValue ? parseFloat(newValue) : undefined
-                      })}
-                      placeholder="0.0"
-                    />
-                  </td>
-                  
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {scoreResult?.score !== null ? (
-                      <div className="flex flex-col items-center">
-                        <span className={`font-bold text-lg ${
-                          scoreResult.score >= 1000 ? 'text-green-600' : 
-                          scoreResult.score >= 500 ? 'text-yellow-600' : 'text-gray-600'
-                        }`}>
-                          {scoreResult.score.toLocaleString('pt-BR')}
-                        </span>
-                        {scoreResult.breakdown.bonus > 0 && (
-                          <span className="text-xs text-purple-600">+{scoreResult.breakdown.bonus * 100} bônus</span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  ) : (
+                    <span style={{ color: '#a0aec0' }}>-</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      
+      <div style={{
+        padding: '15px',
+        background: '#f8f9fa',
+        borderTop: '1px solid #eee',
+        fontSize: '12px',
+        color: '#666',
+        textAlign: 'center'
+      }}>
+        Total de dias no mês: {daysInMonth} • Entradas carregadas: {monthlyData.entries.length}
       </div>
     </div>
   );

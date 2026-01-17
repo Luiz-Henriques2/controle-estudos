@@ -1,34 +1,55 @@
 import { useState, useEffect, useCallback } from 'react';
-import { MonthlyData, ActivityWeights, Objective } from '../core/models/types';
 import { db } from '../core/data/database';
-import { DailyScoreCalculator } from '../core/calculations/daily-score';
 
 export function useMonthlyData(year: number, month: number) {
-  const [monthlyData, setMonthlyData] = useState<MonthlyData | null>(null);
-  const [weights, setWeights] = useState<ActivityWeights[]>([]);
-  const [objective, setObjective] = useState<Objective | null>(null);
+  const [monthlyData, setMonthlyData] = useState<any>(null);
+  const [weights, setWeights] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
+    console.log(`📊 useMonthlyData: Iniciando para ${month}/${year}`);
     loadData();
   }, [year, month]);
   
   const loadData = async () => {
     setLoading(true);
+    setError(null);
     
     try {
-      const monthly = await db.getMonthlyData(year, month);
-      const allWeights = await db.activityWeights.toArray();
-      const activeObjective = await db.objectives
-        .where('isActive')
-        .equals(true)
-        .first();
+      console.log('🔄 Carregando dados...');
       
+      // 1. Buscar dados do mês
+      const monthly = await db.getMonthlyData(year, month);
+      console.log(`📅 Mês carregado: ${monthly.entries.length} entradas`);
+      
+      // 2. Buscar pesos
+      const allWeights = await db.getWeights();
+      console.log(`⚖️ Pesos carregados: ${allWeights.length}`);
+      
+      // 3. Atualizar estado
       setMonthlyData(monthly);
-      setWeights(allWeights.sort((a, b) => a.order - b.order));
-      setObjective(activeObjective || null);
+      setWeights(allWeights.sort((a, b) => (a.order || 0) - (b.order || 0)));
+      
+      console.log('✅ Dados carregados com sucesso!');
+      
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('❌ Erro ao carregar dados:', error);
+      setError('Erro ao carregar dados. Tente recarregar a página.');
+      
+      // Criar dados vazios em caso de erro
+      setMonthlyData({
+        id: `${year}-${month.toString().padStart(2, '0')}`,
+        year,
+        month,
+        entries: [],
+        objectiveId: '1',
+        metaHours: 100,
+        metaPoints: 10000,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      setWeights([]);
     } finally {
       setLoading(false);
     }
@@ -37,7 +58,7 @@ export function useMonthlyData(year: number, month: number) {
   const updateDailyEntry = useCallback(async (
     day: number,
     updates: {
-      activityId?: string;
+      activityName?: string;
       activityValue?: number;
       wakeUpTime?: number;
       sleepTime?: number;
@@ -46,26 +67,44 @@ export function useMonthlyData(year: number, month: number) {
   ) => {
     if (!monthlyData) return;
     
+    console.log(`📝 Atualizando dia ${day}...`);
+    
     const entryId = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-    const entryIndex = monthlyData.entries.findIndex(e => e.date.getDate() === day);
     
-    if (entryIndex === -1) return;
+    // Encontrar ou criar entrada
+    let entryIndex = monthlyData.entries.findIndex((e: any) => {
+      if (!e.date) return false;
+      return e.date.getDate() === day;
+    });
     
-    const entry = monthlyData.entries[entryIndex];
+    let entry;
+    if (entryIndex === -1) {
+      // Criar nova entrada
+      entry = {
+        id: entryId,
+        date: new Date(year, month - 1, day),
+        activities: {},
+        updatedAt: new Date()
+      };
+      monthlyData.entries.push(entry);
+      entryIndex = monthlyData.entries.length - 1;
+    } else {
+      entry = monthlyData.entries[entryIndex];
+    }
+    
+    // Atualizar entrada
     const updatedEntry = {
       ...entry,
       updatedAt: new Date()
     };
     
-    // Atualiza atividade específica
-    if (updates.activityId !== undefined && updates.activityValue !== undefined) {
+    if (updates.activityName !== undefined && updates.activityValue !== undefined) {
       updatedEntry.activities = {
         ...updatedEntry.activities,
-        [updates.activityId]: updates.activityValue
+        [updates.activityName]: updates.activityValue
       };
     }
     
-    // Atualiza outros campos
     if (updates.wakeUpTime !== undefined) {
       updatedEntry.wakeUpTime = updates.wakeUpTime;
     }
@@ -78,44 +117,33 @@ export function useMonthlyData(year: number, month: number) {
       updatedEntry.bonus = updates.bonus;
     }
     
-    // Atualiza localmente
+    // Atualizar estado local
     const updatedEntries = [...monthlyData.entries];
     updatedEntries[entryIndex] = updatedEntry;
     
-    setMonthlyData({
+    const updatedMonthlyData = {
       ...monthlyData,
-      entries: updatedEntries
-    });
+      entries: updatedEntries,
+      updatedAt: new Date()
+    };
     
-    // Persiste no banco
-    await db.updateDailyEntry(updatedEntry);
-  }, [monthlyData, year, month]);
-  
-  const calculateDailyScore = useCallback((day: number) => {
-    if (!monthlyData || !objective || weights.length === 0) {
-      return null;
+    setMonthlyData(updatedMonthlyData);
+    
+    // Salvar no banco
+    try {
+      await db.updateDailyEntry(updatedEntry);
+      console.log(`💾 Entrada do dia ${day} salva`);
+    } catch (error) {
+      console.error(`❌ Erro ao salvar entrada do dia ${day}:`, error);
     }
-    
-    const entry = monthlyData.entries.find(
-      e => e.date.getDate() === day
-    );
-    
-    if (!entry) return null;
-    
-    return DailyScoreCalculator.calculate(
-      entry,
-      weights,
-      objective.weights
-    );
-  }, [monthlyData, objective, weights]);
+  }, [monthlyData, year, month]);
   
   return {
     monthlyData,
     weights,
-    objective,
     loading,
+    error,
     updateDailyEntry,
-    calculateDailyScore,
     refresh: loadData
   };
 }

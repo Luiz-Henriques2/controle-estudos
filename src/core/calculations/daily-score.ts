@@ -8,6 +8,7 @@ export class DailyScoreCalculator {
   ): DailyScoreResult {
     // Verifica se há dados base
     const hasBaseData = this.hasBaseData(entry, weights);
+    
     if (!hasBaseData) {
       return {
         score: null,
@@ -25,10 +26,11 @@ export class DailyScoreCalculator {
     let activityTotal = 0;
 
     weights.forEach(weightConfig => {
-      const activityHours = entry.activities[weightConfig.id] || 0;
-      const objectiveWeight = objectiveWeights[weightConfig.id] || weightConfig.weight;
+      const activityName = weightConfig.name;
+      const activityHours = entry.activities[activityName] || 0;
+      const objectiveWeight = objectiveWeights[activityName] || weightConfig.weight;
       const score = activityHours * objectiveWeight;
-      activityScores[weightConfig.id] = score;
+      activityScores[activityName] = score;
       activityTotal += score;
     });
 
@@ -36,7 +38,7 @@ export class DailyScoreCalculator {
     const wakeUpAdjustment = this.calculateWakeUpAdjustment(
       entry.sleepTime,
       entry.wakeUpTime,
-      objectiveWeights.acordar || 0.1
+      objectiveWeights['Acordar'] || 0.1
     );
 
     // Bônus manual
@@ -45,7 +47,7 @@ export class DailyScoreCalculator {
     // Soma total antes da multiplicação
     const totalBeforeScale = activityTotal + wakeUpAdjustment + bonus;
 
-    // Multiplicação final por 100
+    // Multiplicação final por 100 (FÓRMULA-MÃE)
     const finalScore = Math.round(totalBeforeScale * 100);
 
     return {
@@ -60,12 +62,12 @@ export class DailyScoreCalculator {
   }
 
   private static hasBaseData(entry: DailyEntry, weights: ActivityWeights[]): boolean {
-    // Verifica se há pelo menos uma atividade com horas
+    // Verifica se há pelo menos uma atividade com horas > 0
     const hasActivityHours = weights.some(w => 
-      (entry.activities[w.id] || 0) > 0
+      (entry.activities[w.name] || 0) > 0
     );
     
-    // Verifica hora de acordar
+    // OU se tem hora de acordar preenchida
     const hasWakeUpTime = entry.wakeUpTime != null;
     
     return hasActivityHours || hasWakeUpTime;

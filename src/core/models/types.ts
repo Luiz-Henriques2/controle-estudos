@@ -1,5 +1,5 @@
 export interface ActivityWeights {
-  id: string;
+  id?: number;
   name: string;
   weight: number;
   color: string;
@@ -7,7 +7,7 @@ export interface ActivityWeights {
 }
 
 export interface Objective {
-  id: string;
+  id?: number;
   name: string;
   weights: Record<string, number>;
   isActive: boolean;
@@ -15,7 +15,7 @@ export interface Objective {
 }
 
 export interface DailyEntry {
-  id: string;
+  id: string; // Formato: YYYY-MM-DD
   date: Date;
   activities: Record<string, number>;
   wakeUpTime?: number;
@@ -26,6 +26,7 @@ export interface DailyEntry {
 }
 
 export interface MonthlyData {
+  id: string; // Formato: YYYY-MM
   year: number;
   month: number;
   entries: DailyEntry[];

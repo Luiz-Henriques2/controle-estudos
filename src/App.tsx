@@ -1,112 +1,192 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useDatabase } from './hooks/useDatabase';
 import { MonthlyTable } from './components/MonthlyTable/MonthlyTable';
-import { CalendarPicker } from './components/UI/CalendarPicker';
-import { DateUtils } from './core/utils/date-utils';
+import './styles/global.css';
 
 function App() {
-  const { isReady } = useDatabase();
-  const { year: currentYear, month: currentMonth } = DateUtils.getCurrentDate();
-  
-  const [selectedDate, setSelectedDate] = useState({
-    year: currentYear,
-    month: currentMonth
+  const { isReady, error } = useDatabase();
+  const [currentDate, setCurrentDate] = useState(() => {
+    const now = new Date();
+    return {
+      year: now.getFullYear(),
+      month: now.getMonth() + 1
+    };
   });
+
+  const monthNames = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+
+  const handlePreviousMonth = () => {
+    setCurrentDate(prev => {
+      if (prev.month === 1) {
+        return { year: prev.year - 1, month: 12 };
+      }
+      return { ...prev, month: prev.month - 1 };
+    });
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(prev => {
+      if (prev.month === 12) {
+        return { year: prev.year + 1, month: 1 };
+      }
+      return { ...prev, month: prev.month + 1 };
+    });
+  };
+
+  // Teste no console
+  useEffect(() => {
+    if (isReady) {
+      console.log('✅ App: Banco está pronto!');
+      console.log('📅 Data atual:', currentDate);
+    }
+  }, [isReady, currentDate]);
+
+  if (error) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <h2 style={{ color: '#dc3545' }}>❌ Erro</h2>
+        <p>{error}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          style={{
+            padding: '10px 20px',
+            background: '#dc3545',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            marginTop: '20px'
+          }}
+        >
+          Recarregar
+        </button>
+      </div>
+    );
+  }
 
   if (!isReady) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Inicializando banco de dados...</p>
-        </div>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        flexDirection: 'column'
+      }}>
+        <div className="spinner"></div>
+        <p style={{ marginTop: '20px' }}>Inicializando banco de dados...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row justify-between items-center py-6">
-            <div className="mb-4 sm:mb-0">
-              <h1 className="text-3xl font-bold text-gray-900">
-                📊 Controle de Estudos
-              </h1>
-              <p className="text-gray-600 mt-1">
-                Sistema offline para acompanhamento diário
-              </p>
-            </div>
-            
-            <div className="w-full sm:w-auto">
-              <CalendarPicker
-                year={selectedDate.year}
-                month={selectedDate.month}
-                onChange={(year, month) => setSelectedDate({ year, month })}
-              />
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-2">
-            {DateUtils.getMonthName(selectedDate.month)} {selectedDate.year}
+    <div style={{ minHeight: '100vh', background: '#f8f9fa', padding: '20px' }}>
+      <h1 style={{ textAlign: 'center', color: '#3b82f6' }}>🎯 Controle de Estudos</h1>
+      
+      {/* Controles do mês */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        marginBottom: '20px',
+        background: 'white',
+        padding: '15px',
+        borderRadius: '10px',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}>
+        <button 
+          onClick={handlePreviousMonth}
+          style={{
+            padding: '10px 20px',
+            background: '#6c757d',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          ← Anterior
+        </button>
+        
+        <div style={{ textAlign: 'center' }}>
+          <h2 style={{ margin: 0 }}>
+            {monthNames[currentDate.month - 1]} {currentDate.year}
           </h2>
-          <p className="text-gray-600">
-            Preencha suas horas diárias. Os cálculos são automáticos.
-          </p>
-        </div>
-
-        <MonthlyTable
-          year={selectedDate.year}
-          month={selectedDate.month}
-        />
-
-        {/* Informações */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="font-semibold text-blue-800 mb-2">Como funciona:</h3>
-          <ul className="text-blue-700 text-sm space-y-1">
-            <li>• Preencha as horas de cada atividade diariamente</li>
-            <li>• A pontuação é calculada automaticamente</li>
-            <li>• Dados salvos localmente no seu navegador</li>
-            <li>• Funciona 100% offline</li>
-            <li>• Atualize a hora de dormir e acordar para cálculos extras</li>
-          </ul>
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 mt-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row justify-between items-center">
-            <p className="text-gray-500 text-sm">
-              Sistema offline • Dados armazenados localmente
-            </p>
-            <div className="mt-2 sm:mt-0 flex space-x-4">
-              <button
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 text-sm"
-                onClick={() => {
-                  if (confirm('Exportar dados deste mês?')) {
-                    console.log('Exportar dados:', selectedDate);
-                  }
-                }}
-              >
-                Exportar Dados
-              </button>
-              <button
-                className="px-4 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm"
-                onClick={() => setSelectedDate({ year: currentYear, month: currentMonth })}
-              >
-                Voltar para Hoje
-              </button>
-            </div>
+          <div style={{ fontSize: '14px', color: '#666' }}>
+            {currentDate.month.toString().padStart(2, '0')}/{currentDate.year}
           </div>
         </div>
-      </footer>
+        
+        <button 
+          onClick={handleNextMonth}
+          style={{
+            padding: '10px 20px',
+            background: '#6c757d',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          Próximo →
+        </button>
+      </div>
+
+      {/* Tabela */}
+      <MonthlyTable
+        year={currentDate.year}
+        month={currentDate.month}
+      />
+
+      {/* Botões de debug */}
+      <div style={{ 
+        marginTop: '30px', 
+        padding: '20px', 
+        background: '#e6f7ff',
+        borderRadius: '10px',
+        textAlign: 'center'
+      }}>
+        <button
+          onClick={() => {
+            // Limpar banco
+            indexedDB.deleteDatabase('StudyControlDB');
+            alert('Banco deletado! Recarregando...');
+            setTimeout(() => window.location.reload(), 1000);
+          }}
+          style={{
+            padding: '10px 20px',
+            background: '#dc3545',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            marginRight: '10px'
+          }}
+        >
+          🗑️ Deletar Banco
+        </button>
+        
+        <button
+          onClick={() => {
+            console.log('Banco:', (window as any).studyDB);
+            console.log('Data atual:', currentDate);
+            alert('Verifique o console (F12)');
+          }}
+          style={{
+            padding: '10px 20px',
+            background: '#0d6efd',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          🔍 Debug
+        </button>
+      </div>
     </div>
   );
 }
