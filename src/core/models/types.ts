@@ -1,11 +1,13 @@
 export interface ActivityWeights {
   id?: number;
   name: string;
-  weight: number;
+  weight?: number; // Depreciado - usar importance
+  importance?: number; // Importância de 1-5 estrelas
   color: string;
   order: number;
-  target?: number; // Meta padrão de horas diárias
+  target?: number; // Meta padrão de horas diárias (depreciado - usar targetsByDay)
   targetsByDay?: Record<string, number>; // Metas específicas por dia da semana (Seg, Ter, Qua, etc)
+  hidden?: boolean; // Se a atividade está oculta (não deletada)
 }
 
 export interface Objective {

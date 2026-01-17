@@ -44,12 +44,8 @@ export const WeightEditor: React.FC<WeightEditorProps> = ({ onClose }) => {
       alert('Nome da atividade é obrigatório');
       return;
     }
-    if (editForm.weight === undefined || editForm.weight < 0) {
-      alert('Peso deve ser um número positivo');
-      return;
-    }
-    if (editForm.target === undefined || editForm.target < 0) {
-      alert('Alvo deve ser um número positivo');
+    if (editForm.importance === undefined || editForm.importance < 1 || editForm.importance > 5) {
+      alert('Importância deve ser entre 1 e 5 estrelas');
       return;
     }
 
@@ -82,10 +78,10 @@ export const WeightEditor: React.FC<WeightEditorProps> = ({ onClose }) => {
   const addNewWeight = async () => {
     const newWeight: ActivityWeights = {
       name: 'Nova Atividade',
-      weight: 1,
+      importance: 3,
       color: '#6366f1',
       order: (weights.length || 0) + 1,
-      target: 1
+      targetsByDay: {}
     };
 
     try {
@@ -97,18 +93,27 @@ export const WeightEditor: React.FC<WeightEditorProps> = ({ onClose }) => {
     }
   };
 
-  const deleteWeight = async (id?: number) => {
+  const hideWeight = async (id?: number) => {
     if (!id) return;
-    if (!confirm('Tem certeza que deseja remover esta atividade? Esta ação não pode ser desfeita.')) {
-      return;
-    }
 
     try {
-      await db.deleteWeight(id);
+      await db.updateWeight(id, { hidden: true } as Partial<ActivityWeights>);
       await loadWeights();
     } catch (error) {
-      console.error('Erro ao remover peso:', error);
-      alert('Erro ao remover atividade');
+      console.error('Erro ao ocultar peso:', error);
+      alert('Erro ao ocultar atividade');
+    }
+  };
+
+  const showWeight = async (id?: number) => {
+    if (!id) return;
+
+    try {
+      await db.updateWeight(id, { hidden: false } as Partial<ActivityWeights>);
+      await loadWeights();
+    } catch (error) {
+      console.error('Erro ao mostrar peso:', error);
+      alert('Erro ao mostrar atividade');
     }
   };
 
@@ -171,21 +176,6 @@ export const WeightEditor: React.FC<WeightEditorProps> = ({ onClose }) => {
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>Gerenciar Atividades</h2>
-        {onClose && (
-          <button
-            onClick={onClose}
-            style={{
-              padding: '8px 16px',
-              background: '#f3f4f6',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            ✕ Fechar
-          </button>
-        )}
       </div>
 
       <div style={{ overflowX: 'auto', marginBottom: '20px' }}>
@@ -197,14 +187,13 @@ export const WeightEditor: React.FC<WeightEditorProps> = ({ onClose }) => {
           <thead>
             <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
               <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600' }}>Nome</th>
-              <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600' }}>Peso</th>
-              <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600' }}>Alvo (h)</th>
+              <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600' }}>Importância</th>
               <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600' }}>Cor</th>
               <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600' }}>Ações</th>
             </tr>
           </thead>
           <tbody>
-            {weights.map((weight, index) => (
+            {weights.filter(w => !w.hidden).map((weight, index) => (
               <tr key={weight.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
                 {editingId === weight.id ? (
                   <>
@@ -223,36 +212,25 @@ export const WeightEditor: React.FC<WeightEditorProps> = ({ onClose }) => {
                       />
                     </td>
                     <td style={{ padding: '12px', textAlign: 'center' }}>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={editForm.weight || 0}
-                        onChange={(e) => setEditForm({ ...editForm, weight: parseFloat(e.target.value) })}
-                        style={{
-                          width: '80px',
-                          padding: '6px 8px',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '4px',
-                          fontSize: '14px',
-                          textAlign: 'center'
-                        }}
-                      />
-                    </td>
-                    <td style={{ padding: '12px', textAlign: 'center' }}>
-                      <input
-                        type="number"
-                        step="0.5"
-                        value={editForm.target || 0}
-                        onChange={(e) => setEditForm({ ...editForm, target: parseFloat(e.target.value) })}
-                        style={{
-                          width: '80px',
-                          padding: '6px 8px',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '4px',
-                          fontSize: '14px',
-                          textAlign: 'center'
-                        }}
-                      />
+                      <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <button
+                            key={star}
+                            onClick={() => setEditForm({ ...editForm, importance: star })}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '24px',
+                              padding: '0',
+                              opacity: star <= (editForm.importance || 0) ? 1 : 0.3,
+                              transition: 'opacity 0.2s'
+                            }}
+                          >
+                            ★
+                          </button>
+                        ))}
+                      </div>
                     </td>
                     <td style={{ padding: '12px', textAlign: 'center' }}>
                       <input
@@ -316,10 +294,9 @@ export const WeightEditor: React.FC<WeightEditorProps> = ({ onClose }) => {
                       </div>
                     </td>
                     <td style={{ padding: '12px', textAlign: 'center', color: '#666' }}>
-                      {weight.weight}
-                    </td>
-                    <td style={{ padding: '12px', textAlign: 'center', color: '#666' }}>
-                      {weight.target || '-'}
+                      <div style={{ fontSize: '18px', letterSpacing: '2px' }}>
+                        {Array(weight.importance || 3).fill('★').join('')}
+                      </div>
                     </td>
                     <td style={{ padding: '12px', textAlign: 'center' }}>
                       <div
@@ -395,20 +372,37 @@ export const WeightEditor: React.FC<WeightEditorProps> = ({ onClose }) => {
                       >
                         📅 Metas
                       </button>
-                      <button
-                        onClick={() => deleteWeight(weight.id)}
-                        style={{
-                          padding: '4px 8px',
-                          background: '#ef4444',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '3px',
-                          cursor: 'pointer',
-                          fontSize: '12px'
-                        }}
-                      >
-                        🗑️ Remover
-                      </button>
+                      {weight.hidden ? (
+                        <button
+                          onClick={() => showWeight(weight.id)}
+                          style={{
+                            padding: '4px 8px',
+                            background: '#10b981',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '3px',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                        >
+                          👁️ Mostrar
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => hideWeight(weight.id)}
+                          style={{
+                            padding: '4px 8px',
+                            background: '#f59e0b',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '3px',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                        >
+                          👁️‍🗨️ Ocultar
+                        </button>
+                      )}
                     </td>
                   </>
                 )}
@@ -417,6 +411,52 @@ export const WeightEditor: React.FC<WeightEditorProps> = ({ onClose }) => {
           </tbody>
         </table>
       </div>
+
+      {weights.some(w => w.hidden) && (
+        <div style={{ marginBottom: '20px', padding: '15px', background: '#f0f9ff', borderRadius: '6px', border: '1px solid #e0f2fe' }}>
+          <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600', color: '#0369a1' }}>
+            👁️‍🗨️ Atividades Ocultas ({weights.filter(w => w.hidden).length})
+          </h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {weights.filter(w => w.hidden).map(weight => (
+              <div key={weight.id} style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 12px',
+                background: 'white',
+                borderRadius: '4px',
+                border: `1px solid ${weight.color}40`,
+                fontSize: '13px'
+              }}>
+                <div style={{
+                  width: '12px',
+                  height: '12px',
+                  background: weight.color,
+                  borderRadius: '2px'
+                }} />
+                <span>{weight.name}</span>
+                <button
+                  onClick={() => showWeight(weight.id)}
+                  style={{
+                    padding: '3px 8px',
+                    background: weight.color,
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: '500',
+                    marginLeft: '4px'
+                  }}
+                >
+                  Mostrar
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <button
         onClick={addNewWeight}

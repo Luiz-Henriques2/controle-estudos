@@ -77,7 +77,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ debugInfo }) => {
             >
               <div style={{ fontWeight: 'bold' }}>{weight.name}</div>
               <div style={{ fontSize: '12px', color: '#6c757d' }}>
-                Peso: {weight.weight} • Ordem: {weight.order}
+                Importância: {Array(weight.importance || 3).fill('★').join('')} • Ordem: {weight.order}
               </div>
             </div>
           ))}

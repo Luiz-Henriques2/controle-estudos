@@ -61,15 +61,55 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
     return Math.max(0, decimal - decrement);
   };
   
-  // Função simples para calcular pontuação
-  const calculateSimpleScore = (activities: Record<string, number>) => {
-    let total = 0;
-    Object.entries(activities).forEach(([name, value]) => {
-      const weight = weights.find(w => w.name === name)?.weight || 1;
-      // O valor já vem em formato decimal de horas
-      total += value * weight;
+  // Calcular fator F uma vez para o mês
+  // F = (dias_do_mês × 1000) / Σ(Hi × Ii)
+  // onde Hi = horas planejadas (soma por dia do mês usando targetsByDay ou target)
+  // e Ii = importância da atividade i
+  const calculateMonthlyFactor = (): number => {
+    let totalWeightedPlannedHours = 0;
+
+    const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+
+    // Para cada dia do mês, somar as horas planejadas de cada atividade naquele dia
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dow = new Date(year, month - 1, d).getDay();
+      const dayKey = dayNames[dow];
+
+      weights.forEach(weight => {
+        if (weight.hidden) return;
+        const importance = weight.importance || 3;
+        const plannedForDay = weight.targetsByDay && weight.targetsByDay[dayKey] !== undefined
+          ? weight.targetsByDay[dayKey]
+          : (weight.target || 0);
+
+        totalWeightedPlannedHours += plannedForDay * importance;
+      });
+    }
+
+    // Evitar divisão por zero: se não há horas planejadas, retornar 0 (nenhuma pontuação será distribuída)
+    if (totalWeightedPlannedHours === 0) return 0;
+
+    return (daysInMonth * 1000) / totalWeightedPlannedHours;
+  };
+
+  // Calcular pontuação diária
+  // Pontuação do dia = F × horas_registradas_naquele_dia × Ii
+  const calculateDailyScore = (activities: Record<string, number>): number => {
+    const factor = calculateMonthlyFactor();
+    if (!factor) return 0;
+
+    let score = 0;
+
+    Object.entries(activities).forEach(([name, hoursRecorded]) => {
+      const activity = weights.find(w => w.name === name);
+      if (!activity || activity.hidden) return;
+
+      const importance = activity.importance || 3;
+      // pontuacao = fator × horas_registradas × importancia
+      score += factor * hoursRecorded * importance;
     });
-    return Math.round(total * 100);
+
+    return Math.round(score);
   };
   
   if (loading) {
@@ -145,7 +185,7 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
         <thead>
           <tr style={{ background: '#f3f4f6', borderBottom: '2px solid #d1d5db' }}>
             <th style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '700', fontSize: '12px', minWidth: '50px' }}>Dia</th>
-            {weights.map(weight => (
+            {weights.filter(w => !w.hidden).map(weight => (
               <th key={weight.id || weight.name} style={{ 
                 padding: '10px 4px',
                 textAlign: 'center',
@@ -155,8 +195,8 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
                 borderLeft: `3px solid ${weight.color}`
               }}>
                 <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '2px' }}>{weight.name}</div>
-                <div style={{ fontSize: '9px', color: '#666', fontWeight: '500' }}>
-                  P: {weight.weight}
+                <div style={{ fontSize: '16px', letterSpacing: '1px' }}>
+                  {Array(weight.importance || 3).fill('★').join('')}
                 </div>
               </th>
             ))}
@@ -172,7 +212,7 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
             });
             
             const today = isToday(day);
-            const score = entry ? calculateSimpleScore(entry.activities) : null;
+            const score = entry ? calculateDailyScore(entry.activities) : null;
             
             return (
               <tr key={day} style={{ 
@@ -195,7 +235,7 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
                   </div>
                 </td>
                 
-                {weights.map(weight => {
+                {weights.filter(w => !w.hidden).map(weight => {
                   const value = entry?.activities[weight.name] || 0;
                   const dayOfWeek = new Date(year, month - 1, day).getDay();
                   const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];

@@ -137,18 +137,21 @@ function App() {
             Próximo →
           </button>
           <button
-            onClick={() => setShowWeightEditor(true)}
+            onClick={() => setShowWeightEditor(!showWeightEditor)}
             style={{
               padding: '10px 20px',
-              background: '#8b5cf6',
+              background: showWeightEditor ? '#7c3aed' : '#8b5cf6',
               color: 'white',
-              border: 'none',
+              border: '2px solid',
+              borderColor: showWeightEditor ? '#6d28d9' : '#8b5cf6',
               borderRadius: '6px',
               cursor: 'pointer',
-              fontWeight: '500'
+              fontWeight: '500',
+              transition: 'all 0.2s',
+              boxShadow: showWeightEditor ? '0 0 0 3px rgba(139, 92, 246, 0.3)' : 'none'
             }}
           >
-            ⚙️ Atividades
+            ⚙️ Atividades {showWeightEditor ? '✓' : ''}
           </button>
         </div>
       </div>
