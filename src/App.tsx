@@ -85,87 +85,70 @@ function App() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8f9fa', padding: '20px' }}>
-      <h1 style={{ textAlign: 'center', color: '#3b82f6' }}>🎯 Controle de Estudos</h1>
-      
-      {/* Controles do mês */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        marginBottom: '20px',
-        background: 'white',
-        padding: '15px',
-        borderRadius: '10px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-      }}>
-        <button 
-          onClick={handlePreviousMonth}
-          style={{
-            padding: '10px 20px',
-            background: '#6c757d',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer'
-          }}
-        >
-          ← Anterior
-        </button>
-        
-        <div style={{ textAlign: 'center' }}>
-          <h2 style={{ margin: 0 }}>
-            {monthNames[currentDate.month - 1]} {currentDate.year}
-          </h2>
-          <div style={{ fontSize: '14px', color: '#666' }}>
-            {currentDate.month.toString().padStart(2, '0')}/{currentDate.year}
-          </div>
-        </div>
-        
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
-            onClick={handleNextMonth}
-            style={{
-              padding: '10px 20px',
-              background: '#6c757d',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer'
-            }}
-          >
-            Próximo →
-          </button>
-          <button
-            onClick={() => setShowWeightEditor(!showWeightEditor)}
-            style={{
-              padding: '10px 20px',
-              background: showWeightEditor ? '#7c3aed' : '#8b5cf6',
-              color: 'white',
-              border: '2px solid',
-              borderColor: showWeightEditor ? '#6d28d9' : '#8b5cf6',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: '500',
-              transition: 'all 0.2s',
-              boxShadow: showWeightEditor ? '0 0 0 3px rgba(139, 92, 246, 0.3)' : 'none'
-            }}
-          >
-            ⚙️ Atividades {showWeightEditor ? '✓' : ''}
-          </button>
-        </div>
-      </div>
-
-      {/* Editor de Pesos */}
+    <div style={{ 
+      height: '100vh', 
+      background: '#f8f9fa', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      justifyContent: 'center',
+      alignItems: 'center',
+      overflow: 'hidden'
+    }}>
+      {/* Modal de Atividades */}
       {showWeightEditor && (
         <div style={{
-          marginBottom: '20px',
-          background: 'white',
-          borderRadius: '10px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          padding: '20px'
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.4)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          backdropFilter: 'blur(4px)',
+          WebkitBackdropFilter: 'blur(4px)',
+          animation: 'fadeIn 0.2s ease-out'
         }}>
-          <WeightEditor onClose={() => setShowWeightEditor(false)} />
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            boxShadow: '0 20px 50px -10px rgba(0,0,0,0.3)',
+            padding: '30px',
+            maxWidth: '1000px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            animation: 'slideUp 0.3s ease-out',
+            position: 'relative'
+          }}>
+            {/* Botão de Fechar */}
+            <button
+              onClick={() => setShowWeightEditor(false)}
+              style={{
+                position: 'absolute',
+                top: '30px',
+                right: '40px',
+                background: 'transparent',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                opacity: 0.6,
+                transition: 'opacity 0.2s',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
+              title="Fechar"
+            >
+              ✕
+            </button>
+            <WeightEditor onClose={() => setShowWeightEditor(false)} />
+          </div>
         </div>
       )}
 
@@ -173,54 +156,30 @@ function App() {
       <MonthlyTable
         year={currentDate.year}
         month={currentDate.month}
+        currentMonth={currentDate}
+        monthNames={monthNames}
+        onPreviousMonth={handlePreviousMonth}
+        onNextMonth={handleNextMonth}
+        showWeightEditor={showWeightEditor}
+        onToggleWeightEditor={() => setShowWeightEditor(!showWeightEditor)}
       />
 
-      {/* Botões de debug */}
-      <div style={{ 
-        marginTop: '30px', 
-        padding: '20px', 
-        background: '#e6f7ff',
-        borderRadius: '10px',
-        textAlign: 'center'
-      }}>
-        <button
-          onClick={() => {
-            // Limpar banco
-            indexedDB.deleteDatabase('StudyControlDB');
-            alert('Banco deletado! Recarregando...');
-            setTimeout(() => window.location.reload(), 1000);
-          }}
-          style={{
-            padding: '10px 20px',
-            background: '#dc3545',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            marginRight: '10px'
-          }}
-        >
-          🗑️ Deletar Banco
-        </button>
-        
-        <button
-          onClick={() => {
-            console.log('Banco:', (window as any).studyDB);
-            console.log('Data atual:', currentDate);
-            alert('Verifique o console (F12)');
-          }}
-          style={{
-            padding: '10px 20px',
-            background: '#0d6efd',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer'
-          }}
-        >
-          🔍 Debug
-        </button>
-      </div>
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 }

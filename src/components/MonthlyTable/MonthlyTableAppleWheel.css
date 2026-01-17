@@ -1,0 +1,72 @@
+.apple-wheel-container {
+  position: relative;
+  height: 420px;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+}
+
+.apple-wheel-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* Máscara estilo iOS */
+.apple-wheel-container::before,
+.apple-wheel-container::after {
+  content: '';
+  position: sticky;
+  left: 0;
+  right: 0;
+  height: 80px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.apple-wheel-container::before {
+  top: 0;
+  background: linear-gradient(to bottom, white 30%, transparent);
+}
+
+.apple-wheel-container::after {
+  bottom: 0;
+  background: linear-gradient(to top, white 30%, transparent);
+}
+
+.apple-wheel-item {
+  height: 70px;
+  scroll-snap-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform 0.25s ease,
+    opacity 0.25s ease,
+    filter 0.25s ease;
+}
+
+.apple-wheel-card {
+  width: 95%;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+  padding: 12px 16px;
+  display: grid;
+  grid-template-columns: 60px 1fr 80px;
+  align-items: center;
+}
+
+.apple-day {
+  font-weight: 800;
+  font-size: 16px;
+  text-align: center;
+}
+
+.apple-activities {
+  font-size: 13px;
+  color: #374151;
+}
+
+.apple-score {
+  text-align: right;
+  font-weight: 700;
+}
