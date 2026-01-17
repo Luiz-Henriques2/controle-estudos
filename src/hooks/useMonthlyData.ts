@@ -60,6 +60,8 @@ export function useMonthlyData(year: number, month: number) {
     updates: {
       activityName?: string;
       activityValue?: number;
+      targetName?: string;
+      targetValue?: number;
       wakeUpTime?: number;
       sleepTime?: number;
       bonus?: number;
@@ -102,6 +104,13 @@ export function useMonthlyData(year: number, month: number) {
       updatedEntry.activities = {
         ...updatedEntry.activities,
         [updates.activityName]: updates.activityValue
+      };
+    }
+    
+    if (updates.targetName !== undefined && updates.targetValue !== undefined) {
+      updatedEntry.targets = {
+        ...updatedEntry.targets,
+        [updates.targetName]: updates.targetValue
       };
     }
     

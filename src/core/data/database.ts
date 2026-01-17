@@ -65,19 +65,22 @@ export class StudyControlDB extends Dexie {
           name: 'Estudo', 
           weight: 1.6, 
           color: '#3b82f6', 
-          order: 1 
+          order: 1,
+          target: 3 // 3 horas de meta diária
         },
         { 
           name: 'Inglês', 
           weight: 1.3, 
           color: '#10b981', 
-          order: 2 
+          order: 2,
+          target: 1 // 1 hora de meta diária
         },
         { 
           name: 'Trabalho', 
           weight: 0.7, 
           color: '#8b5cf6', 
-          order: 3 
+          order: 3,
+          target: 2 // 2 horas de meta diária
         }
         // REMOVIDO ACORDAR
       ];
@@ -264,6 +267,18 @@ export class StudyControlDB extends Dexie {
   
   async getWeights(): Promise<ActivityWeights[]> {
     return await this.activityWeights.orderBy('order').toArray();
+  }
+  
+  async addWeight(weight: ActivityWeights): Promise<number> {
+    return await this.activityWeights.add(weight);
+  }
+  
+  async updateWeight(id: number, weight: Partial<ActivityWeights>): Promise<number> {
+    return await this.activityWeights.update(id, weight);
+  }
+  
+  async deleteWeight(id: number): Promise<void> {
+    await this.activityWeights.delete(id);
   }
   
   async getActiveObjective(): Promise<Objective | undefined> {

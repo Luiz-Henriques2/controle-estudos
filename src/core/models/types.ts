@@ -4,6 +4,8 @@ export interface ActivityWeights {
   weight: number;
   color: string;
   order: number;
+  target?: number; // Meta padrão de horas diárias
+  targetsByDay?: Record<string, number>; // Metas específicas por dia da semana (Seg, Ter, Qua, etc)
 }
 
 export interface Objective {
@@ -18,6 +20,7 @@ export interface DailyEntry {
   id: string; // Formato: YYYY-MM-DD
   date: Date;
   activities: Record<string, number>;
+  targets?: Record<string, number>; // Metas personalizadas por atividade para este dia
   wakeUpTime?: number;
   sleepTime?: number;
   bonus?: number;

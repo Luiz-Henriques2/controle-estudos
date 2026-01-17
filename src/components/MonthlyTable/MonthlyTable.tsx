@@ -32,12 +32,42 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
            year === today.getFullYear();
   };
   
+  // Converter decimal para formato amigável (ex: 1.5 -> "1h30", 1.0 -> "1h")
+  const decimalToTimeString = (decimal: number): string => {
+    if (!decimal || decimal === 0) return '-';
+    const hours = Math.floor(decimal);
+    const minutes = Math.round((decimal - hours) * 60);
+    
+    if (minutes === 0) {
+      return `${hours}h`;
+    }
+    return `${hours}h${String(minutes).padStart(2, '0')}`;
+  };
+  
+  // Converter HH:MM para decimal (ex: "01:30" -> 1.5)
+  const timeStringToDecimal = (timeStr: string): number => {
+    if (!timeStr || timeStr === '00:00' || timeStr === '-') return 0;
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return hours + (minutes / 60);
+  };
+  
+  // Incrementar em 30 minutos
+  const incrementTime = (decimal: number, increment: 0.5 = 0.5): number => {
+    return Math.max(0, decimal + increment);
+  };
+  
+  // Decrementar em 30 minutos
+  const decrementTime = (decimal: number, decrement: 0.5 = 0.5): number => {
+    return Math.max(0, decimal - decrement);
+  };
+  
   // Função simples para calcular pontuação
   const calculateSimpleScore = (activities: Record<string, number>) => {
     let total = 0;
-    Object.entries(activities).forEach(([name, hours]) => {
+    Object.entries(activities).forEach(([name, value]) => {
       const weight = weights.find(w => w.name === name)?.weight || 1;
-      total += hours * weight;
+      // O valor já vem em formato decimal de horas
+      total += value * weight;
     });
     return Math.round(total * 100);
   };
@@ -105,33 +135,38 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
   });
   
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{ 
-        width: '100%', 
-        borderCollapse: 'collapse',
-        background: 'white'
-      }}>
+    <div style={{ display: 'flex', justifyContent: 'center', padding: '0 15px' }}>
+      <div style={{ width: '100%', maxWidth: '700px', overflowX: 'auto', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <table style={{ 
+          width: '100%', 
+          borderCollapse: 'collapse',
+          background: 'white'
+        }}>
         <thead>
-          <tr style={{ background: '#f8f9fa' }}>
-            <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600' }}>Dia</th>
+          <tr style={{ background: '#f3f4f6', borderBottom: '2px solid #d1d5db' }}>
+            <th style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '700', fontSize: '12px', minWidth: '50px' }}>Dia</th>
             {weights.map(weight => (
-              <th key={weight.id || weight.name} style={{ padding: '12px', textAlign: 'center', fontWeight: '600' }}>
-                <div>{weight.name}</div>
-                <div style={{ fontSize: '11px', color: '#666', fontWeight: 'normal' }}>
-                  peso: {weight.weight}
+              <th key={weight.id || weight.name} style={{ 
+                padding: '10px 4px',
+                textAlign: 'center',
+                fontWeight: '700',
+                fontSize: '11px',
+                background: '#f9fafb',
+                borderLeft: `3px solid ${weight.color}`
+              }}>
+                <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '2px' }}>{weight.name}</div>
+                <div style={{ fontSize: '9px', color: '#666', fontWeight: '500' }}>
+                  P: {weight.weight}
                 </div>
               </th>
             ))}
-            <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600' }}>Dormir</th>
-            <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600' }}>Acordar</th>
-            <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600' }}>Bônus</th>
-            <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600' }}>Pontuação</th>
+            <th style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '700', fontSize: '12px', background: '#ecfdf5', borderLeft: '3px solid #10b981' }}>Pontuação</th>
           </tr>
         </thead>
         <tbody>
           {Array.from({ length: daysInMonth }, (_, index) => {
             const day = index + 1;
-            const entry = monthlyData.entries.find(e => {
+            const entry = monthlyData.entries.find((e: any) => {
               if (!e.date) return false;
               return e.date.getDate() === day;
             });
@@ -141,127 +176,159 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
             
             return (
               <tr key={day} style={{ 
-                borderBottom: '1px solid #eee',
-                background: today ? '#e6f7ff' : 'white'
+                borderBottom: '3px solid #d1d5db',
+                background: today ? '#fef3c7' : 'white',
+                transition: 'background 0.2s'
               }}>
                 <td style={{ 
-                  padding: '12px',
+                  padding: '8px 6px',
                   textAlign: 'center',
-                  fontWeight: today ? 'bold' : 'normal'
+                  fontWeight: today ? '700' : '500',
+                  fontSize: '12px',
+                  color: today ? '#92400e' : '#374151'
                 }}>
-                  <div style={{ fontSize: today ? '16px' : '14px' }}>
+                  <div style={{ fontSize: today ? '14px' : '13px', fontWeight: 'bold' }}>
                     {day}
                   </div>
-                  <div style={{ fontSize: '12px', color: '#666', marginTop: '3px' }}>
+                  <div style={{ fontSize: '9px', color: '#999', marginTop: '2px' }}>
                     {getDayName(day)}
                   </div>
                 </td>
                 
                 {weights.map(weight => {
                   const value = entry?.activities[weight.name] || 0;
+                  const dayOfWeek = new Date(year, month - 1, day).getDay();
+                  const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+                  const currentDay = dayNames[dayOfWeek];
+                  // Tenta usar alvo do dia da semana, senão usa alvo diário personalizado do dia, senão usa alvo padrão
+                  const dailyTarget = weight.targetsByDay?.[currentDay] || entry?.targets?.[weight.name] || weight.target || 0;
+                  const progress = dailyTarget > 0 ? (value / dailyTarget) * 100 : 0;
+                  const progressCapped = Math.min(progress, 100);
+                  const timeDisplay = decimalToTimeString(value);
                   
                   return (
-                    <td key={weight.id || weight.name} style={{ padding: '10px', textAlign: 'center' }}>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={value}
-                        onChange={(e) => {
-                          const newValue = parseFloat(e.target.value) || 0;
-                          console.log(`Atualizando ${weight.name} dia ${day}: ${newValue}`);
-                          updateDailyEntry(day, {
-                            activityName: weight.name,
-                            activityValue: newValue
-                          });
-                        }}
-                        style={{
-                          width: '70px',
-                          padding: '8px',
-                          border: `2px solid ${weight.color}30`,
-                          borderRadius: '6px',
-                          background: '#f8f9fa',
-                          textAlign: 'center',
-                          fontSize: '14px'
-                        }}
-                      />
+                    <td key={weight.id || weight.name} style={{ 
+                      padding: '6px 3px', 
+                      textAlign: 'center',
+                      background: `${weight.color}15`,
+                      borderLeft: `2px solid ${weight.color}`
+                    }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {/* Input de valor com +/- */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1px' }}>
+                          <button
+                            onClick={() => {
+                              const newValue = decrementTime(value);
+                              updateDailyEntry(day, {
+                                activityName: weight.name,
+                                activityValue: newValue
+                              });
+                            }}
+                            style={{
+                              width: '18px',
+                              height: '18px',
+                              padding: '0',
+                              border: `1px solid ${weight.color}60`,
+                              background: '#fff',
+                              borderRadius: '3px',
+                              cursor: 'pointer',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              color: weight.color,
+                              flex: '0 0 auto'
+                            }}
+                          >
+                            −
+                          </button>
+                          <input
+                            type="text"
+                            value={timeDisplay}
+                            onChange={(e) => {
+                              const timeStr = e.target.value;
+                              const newValue = timeStringToDecimal(timeStr);
+                              if (newValue >= 0) {
+                                updateDailyEntry(day, {
+                                  activityName: weight.name,
+                                  activityValue: newValue
+                                });
+                              }
+                            }}
+                            placeholder="-"
+                            style={{
+                              width: '42px',
+                              padding: '3px 4px',
+                              border: `1px solid ${weight.color}60`,
+                              borderRadius: '3px',
+                              background: '#fff',
+                              textAlign: 'center',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              color: value > 0 ? weight.color : '#999',
+                              flex: '1'
+                            }}
+                          />
+                          <button
+                            onClick={() => {
+                              const newValue = incrementTime(value);
+                              updateDailyEntry(day, {
+                                activityName: weight.name,
+                                activityValue: newValue
+                              });
+                            }}
+                            style={{
+                              width: '18px',
+                              height: '18px',
+                              padding: '0',
+                              border: `1px solid ${weight.color}60`,
+                              background: '#fff',
+                              borderRadius: '3px',
+                              cursor: 'pointer',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              color: weight.color,
+                              flex: '0 0 auto'
+                            }}
+                          >
+                            +
+                          </button>
+                        </div>
+                        
+                        {/* Barra de progresso mais fina */}
+                        {dailyTarget > 0 && (
+                          <div style={{ width: '100%', height: '4px', background: '#e5e7eb', borderRadius: '2px', overflow: 'hidden', position: 'relative' }}>
+                            <div
+                              style={{
+                                width: `${progressCapped}%`,
+                                height: '100%',
+                                background: progressCapped >= 100 ? '#10b981' : progressCapped >= 50 ? '#f59e0b' : '#ef4444',
+                                transition: 'width 0.2s ease'
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
                     </td>
                   );
                 })}
                 
-                <td style={{ padding: '10px', textAlign: 'center' }}>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={entry?.sleepTime || ''}
-                    onChange={(e) => updateDailyEntry(day, {
-                      sleepTime: e.target.value ? parseFloat(e.target.value) : undefined
-                    })}
-                    placeholder="--:--"
-                    style={{
-                      width: '70px',
-                      padding: '8px',
-                      border: '2px solid #e2e8f0',
-                      borderRadius: '6px',
-                      background: '#f8f9fa',
-                      textAlign: 'center',
-                      fontSize: '14px'
-                    }}
-                  />
-                </td>
-                
-                <td style={{ padding: '10px', textAlign: 'center' }}>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={entry?.wakeUpTime || ''}
-                    onChange={(e) => updateDailyEntry(day, {
-                      wakeUpTime: e.target.value ? parseFloat(e.target.value) : undefined
-                    })}
-                    placeholder="--:--"
-                    style={{
-                      width: '70px',
-                      padding: '8px',
-                      border: '2px solid #e2e8f0',
-                      borderRadius: '6px',
-                      background: '#f8f9fa',
-                      textAlign: 'center',
-                      fontSize: '14px'
-                    }}
-                  />
-                </td>
-                
-                <td style={{ padding: '10px', textAlign: 'center' }}>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={entry?.bonus || ''}
-                    onChange={(e) => updateDailyEntry(day, {
-                      bonus: e.target.value ? parseFloat(e.target.value) : undefined
-                    })}
-                    placeholder="0.0"
-                    style={{
-                      width: '70px',
-                      padding: '8px',
-                      border: '2px solid #e2e8f0',
-                      borderRadius: '6px',
-                      background: '#f8f9fa',
-                      textAlign: 'center',
-                      fontSize: '14px'
-                    }}
-                  />
-                </td>
-                
-                <td style={{ padding: '12px', textAlign: 'center', fontWeight: 'bold' }}>
+                <td style={{ 
+                  padding: '8px 6px',
+                  textAlign: 'center',
+                  fontWeight: 'bold',
+                  background: '#ecfdf5',
+                  borderLeft: '3px solid #10b981'
+                }}>
                   {score !== null && score > 0 ? (
                     <div style={{ 
-                      fontSize: '16px',
-                      color: score >= 1000 ? '#10b981' : 
-                             score >= 500 ? '#f59e0b' : '#4a5568'
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      color: score >= 1000 ? '#047857' : 
+                             score >= 500 ? '#d97706' : '#6b7280'
                     }}>
                       {score.toLocaleString('pt-BR')}
                     </div>
                   ) : (
-                    <span style={{ color: '#a0aec0' }}>-</span>
+                    <span style={{ color: '#d1d5db', fontSize: '13px' }}>-</span>
                   )}
                 </td>
               </tr>
@@ -271,14 +338,16 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({ year, month }) => {
       </table>
       
       <div style={{
-        padding: '15px',
-        background: '#f8f9fa',
-        borderTop: '1px solid #eee',
-        fontSize: '12px',
+        padding: '12px 15px',
+        background: '#f9fafb',
+        borderTop: '2px solid #d1d5db',
+        fontSize: '11px',
         color: '#666',
-        textAlign: 'center'
+        textAlign: 'center',
+        fontWeight: '500'
       }}>
-        Total de dias no mês: {daysInMonth} • Entradas carregadas: {monthlyData.entries.length}
+        📊 {daysInMonth} dias • 📁 {monthlyData.entries.length} preenchido(s)
+      </div>
       </div>
     </div>
   );

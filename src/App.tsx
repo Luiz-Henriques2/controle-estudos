@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useDatabase } from './hooks/useDatabase';
 import { MonthlyTable } from './components/MonthlyTable/MonthlyTable';
+import { WeightEditor } from './components/WeightEditor/WeightEditor';
 import './styles/global.css';
 
 function App() {
   const { isReady, error } = useDatabase();
+  const [showWeightEditor, setShowWeightEditor] = useState(false);
   const [currentDate, setCurrentDate] = useState(() => {
     const now = new Date();
     return {
@@ -120,20 +122,49 @@ function App() {
           </div>
         </div>
         
-        <button 
-          onClick={handleNextMonth}
-          style={{
-            padding: '10px 20px',
-            background: '#6c757d',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer'
-          }}
-        >
-          Próximo →
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            onClick={handleNextMonth}
+            style={{
+              padding: '10px 20px',
+              background: '#6c757d',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            Próximo →
+          </button>
+          <button
+            onClick={() => setShowWeightEditor(true)}
+            style={{
+              padding: '10px 20px',
+              background: '#8b5cf6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: '500'
+            }}
+          >
+            ⚙️ Atividades
+          </button>
+        </div>
       </div>
+
+      {/* Editor de Pesos */}
+      {showWeightEditor && (
+        <div style={{
+          marginBottom: '20px',
+          background: 'white',
+          borderRadius: '10px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          padding: '20px'
+        }}>
+          <WeightEditor onClose={() => setShowWeightEditor(false)} />
+        </div>
+      )}
 
       {/* Tabela */}
       <MonthlyTable
