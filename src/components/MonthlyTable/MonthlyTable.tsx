@@ -42,6 +42,115 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
   const MAX_OPACITY = 1;
   const MIN_OPACITY = 0.3;
 
+  // Calcular sequências consecutivas para cada atividade - VERSÃO CORRIGIDA
+  const calculateStreaks = useCallback(() => {
+    const currentStreaks: Record<string, number> = {};
+    const maxStreaks: Record<string, number> = {};
+    
+    // Inicializar streaks
+    weights.forEach(weight => {
+      if (!weight.hidden) {
+        currentStreaks[weight.name] = 0;
+        maxStreaks[weight.name] = 0;
+      }
+    });
+
+    // Verificar se monthlyData existe
+    if (!monthlyData || !monthlyData.entries) {
+      return {
+        current: currentStreaks,
+        max: maxStreaks
+      };
+    }
+
+    const today = new Date();
+    const isCurrentMonth = month === today.getMonth() + 1 && year === today.getFullYear();
+    const todayDay = isCurrentMonth ? today.getDate() : daysInMonth;
+
+    // Para cada atividade, calcular streaks independentemente
+    weights.forEach(weight => {
+      if (weight.hidden) return;
+      
+      const activityName = weight.name;
+      let currentStreak = 0;
+      let maxStreak = 0;
+      
+      // Calcular CURRENT STREAK (sequência atual até hoje)
+      // Começa verificando se HOJE foi feito
+      const todayEntry = monthlyData.entries.find((e: any) => {
+        if (!e.date) return false;
+        return e.date.getDate() === todayDay;
+      });
+      
+      const todayValue = todayEntry?.activities?.[activityName] || 0;
+      const MINIMUM_MINUTES = 0.5;
+      
+      if (todayValue >= MINIMUM_MINUTES) {
+        // Se HOJE foi feito, vamos contar dias consecutivos para trás
+        currentStreak = 1; // Começa com 1 porque hoje foi feito
+        
+        // Agora vai para trás até encontrar um dia que não foi feito
+        for (let day = todayDay - 1; day >= 1; day--) {
+          const entry = monthlyData.entries.find((e: any) => {
+            if (!e.date) return false;
+            return e.date.getDate() === day;
+          });
+          
+          const value = entry?.activities?.[activityName] || 0;
+          
+          if (value >= MINIMUM_MINUTES) {
+            currentStreak++; // Continua a sequência
+          } else {
+            break; // Encontrou um dia que não foi feito, para a contagem
+          }
+        }
+      }
+      // Se hoje NÃO foi feito, currentStreak permanece 0
+      
+      // Calcular MAX STREAK (maior sequência em qualquer período do mês)
+      let tempStreak = 0;
+      maxStreak = 0;
+      
+      for (let day = 1; day <= daysInMonth; day++) {
+        const entry = monthlyData.entries.find((e: any) => {
+          if (!e.date) return false;
+          return e.date.getDate() === day;
+        });
+        
+        const value = entry?.activities?.[activityName] || 0;
+        
+        if (value >= MINIMUM_MINUTES) {
+          tempStreak++;
+          maxStreak = Math.max(maxStreak, tempStreak);
+        } else {
+          tempStreak = 0; // Resetar para esta atividade
+        }
+      }
+      
+      // Atribuir os valores calculados
+      currentStreaks[activityName] = currentStreak;
+      maxStreaks[activityName] = maxStreak;
+    });
+
+    return {
+      current: currentStreaks,
+      max: maxStreaks
+    };
+  }, [monthlyData, weights, daysInMonth, year, month]);
+
+  // Função para atualizar entrada e recálcular streaks
+  const handleUpdateEntry = async (day: number, activityName: string, activityValue: number) => {
+    try {
+      await updateDailyEntry(day, {
+        activityName,
+        activityValue
+      });
+      // O hook useMonthlyData deve atualizar automaticamente os dados
+    } catch (error) {
+      console.error('Erro ao atualizar:', error);
+    }
+  };
+
   // Centralizar scroll inicial
   useEffect(() => {
     if (scrollContainerRef.current) {
@@ -196,6 +305,9 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
     
     return totalScore;
   };
+
+  // Calcular streaks
+  const streaks = calculateStreaks();
 
   if (loading) {
     return (
@@ -387,7 +499,7 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
               </button>
             )}
 
-            {/* Legenda de Atividades */}
+            {/* Legenda de Atividades com estrelas */}
             <div style={{
               display: 'flex',
               gap: '16px',
@@ -398,21 +510,31 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
               {weights.filter(w => !w.hidden).map(weight => (
                 <div key={weight.id || weight.name} style={{
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '2px',
+                  minWidth: '70px'
                 }}>
                   <div style={{
-                    width: '12px',
-                    height: '12px',
-                    borderRadius: '50%',
-                    background: weight.color,
-                    boxShadow: `0 0 0 1px ${weight.color}40`
-                  }} />
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    color: '#475569'
-                  }}>{weight.name}</span>
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <div style={{
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      background: weight.color,
+                      boxShadow: `0 0 0 1px ${weight.color}40`
+                    }} />
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      color: '#475569'
+                    }}>
+                      {weight.name}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -455,7 +577,7 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
             
             if (!isVisible) return null;
             
-            const entry = monthlyData.entries.find((e: any) => {
+            const entry = monthlyData?.entries?.find((e: any) => {
               if (!e.date) return false;
               return e.date.getDate() === day;
             });
@@ -543,12 +665,14 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
                   justifyContent: 'center'
                 }}>
                   {weights.filter(w => !w.hidden).map(weight => {
-                    const value = entry?.activities[weight.name] || 0;
+                    const value = entry?.activities?.[weight.name] || 0;
                     const timeDisplay = decimalToTimeString(value);
                     const dailyTarget = getDailyTarget(weight, day);
                     const targetDisplay = decimalToTimeString(dailyTarget);
                     const progress = dailyTarget > 0 ? (value / dailyTarget) * 100 : 0;
                     const progressCapped = Math.min(progress, 100);
+                    const MINIMUM_MINUTES = 0.5; // 30 minutos
+                    const hasMinimumTime = value >= MINIMUM_MINUTES;
                     
                     return (
                       <div
@@ -558,18 +682,29 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
                           flexDirection: 'column',
                           alignItems: 'center',
                           minWidth: '100px',
-                          gap: '8px'
+                          gap: '8px',
+                          position: 'relative'
                         }}
                       >
-                        <div style={{
-                          fontSize: '10px',
-                          fontWeight: '600',
-                          color: '#64748b',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          marginBottom: '2px'
-                        }}>
-                          {weight.name}
+                        {/* Nome e estrelas */}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
+                          <div style={{
+                            fontSize: '10px',
+                            fontWeight: '600',
+                            color: '#64748b',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em'
+                          }}>
+                            {weight.name}
+                          </div>
+                          <div style={{
+                            fontSize: '10px',
+                            color: '#fbbf24',
+                            letterSpacing: '1px',
+                            lineHeight: '1'
+                          }}>
+                            {Array(weight.importance || 3).fill('★').join('')}
+                          </div>
                         </div>
                         
                         <div style={{
@@ -580,10 +715,7 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
                           <button
                             onClick={() => {
                               const newValue = decrementTime(value);
-                              updateDailyEntry(day, {
-                                activityName: weight.name,
-                                activityValue: newValue
-                              });
+                              handleUpdateEntry(day, weight.name, newValue);
                             }}
                             style={{
                               width: '24px',
@@ -624,10 +756,7 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
                                 const timeStr = e.target.value;
                                 const newValue = timeStringToDecimal(timeStr);
                                 if (newValue >= 0) {
-                                  updateDailyEntry(day, {
-                                    activityName: weight.name,
-                                    activityValue: newValue
-                                  });
+                                  handleUpdateEntry(day, weight.name, newValue);
                                 }
                               }}
                               style={{
@@ -667,10 +796,7 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
                           <button
                             onClick={() => {
                               const newValue = incrementTime(value);
-                              updateDailyEntry(day, {
-                                activityName: weight.name,
-                                activityValue: newValue
-                              });
+                              handleUpdateEntry(day, weight.name, newValue);
                             }}
                             style={{
                               width: '24px',
@@ -815,7 +941,7 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
             fontWeight: '500',
             color: '#64748b'
           }}>
-            {daysInMonth} dias • {monthlyData.entries.length} registrados
+            {daysInMonth} dias • {monthlyData?.entries?.length || 0} registrados
           </div>
           
           <div style={{
@@ -824,9 +950,9 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
             gap: '24px'
           }}>
             {weights.filter(w => !w.hidden).map(weight => {
-              const totalHours = monthlyData.entries.reduce((sum: number, entry: any) => {
-                return sum + (entry.activities[weight.name] || 0);
-              }, 0);
+              const totalHours = monthlyData?.entries?.reduce((sum: number, entry: any) => {
+                return sum + (entry.activities?.[weight.name] || 0);
+              }, 0) || 0;
               
               // Calcular total de alvo para o mês
               let totalTarget = 0;
@@ -848,42 +974,90 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  gap: '6px',
-                  minWidth: '80px'
+                  gap: '4px',
+                  minWidth: '90px',
+                  position: 'relative'
                 }}>
-                  <div style={{
-                    fontSize: '10px',
-                    fontWeight: '600',
-                    color: '#64748b',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
-                  }}>
-                    {weight.name}
+                  {/* Nome e estrelas */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                    <div style={{
+                      fontSize: '9px',
+                      fontWeight: '600',
+                      color: '#64748b',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      {weight.name}
+                    </div>
                   </div>
+                  
+                  {/* Ofensiva (foguinho) - CORRIGIDO */}
+                  {streaks.current[weight.name] > 0 ? (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontSize: '10px',
+                      color: '#dc2626',
+                      fontWeight: '700',
+                      background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.1), rgba(220, 38, 38, 0.1))',
+                      padding: '2px 6px',
+                      borderRadius: '10px',
+                      marginTop: '2px',
+                      animation: streaks.current[weight.name] >= 3 ? 'pulse 2s infinite' : 'none'
+                    }}>
+                      <span>🔥</span>
+                      <span>{streaks.current[weight.name]} {streaks.current[weight.name] === 1 ? 'dia' : 'dias'}</span>
+                      {streaks.max[weight.name] > streaks.current[weight.name] && (
+                        <span style={{
+                          fontSize: '8px',
+                          color: '#9ca3af',
+                          marginLeft: '2px'
+                        }}>
+                          (max: {streaks.max[weight.name]})
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{
+                      fontSize: '10px',
+                      color: '#9ca3af',
+                      padding: '2px 6px',
+                      marginTop: '2px'
+                    }}>
+                      —
+                    </div>
+                  )}
+                  
+                  {/* Horas */}
                   <div style={{
-                    fontSize: '18px',
+                    fontSize: '16px',
                     fontWeight: '700',
                     color: weight.color
                   }}>
                     {decimalToTimeString(totalHours)}
                   </div>
+                  
+                  {/* Alvo */}
                   {totalTarget > 0 && (
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
-                      fontSize: '11px',
+                      gap: '4px',
+                      fontSize: '10px',
                       color: '#94a3b8'
                     }}>
                       <span>/ {decimalToTimeString(totalTarget)}</span>
                     </div>
                   )}
+                  
+                  {/* Barra de progresso */}
                   {totalTarget > 0 && (
                     <div style={{
                       width: '100%',
-                      height: '4px',
+                      height: '3px',
                       background: 'rgba(226, 232, 240, 0.5)',
-                      borderRadius: '2px',
+                      borderRadius: '1.5px',
                       overflow: 'hidden'
                     }}>
                       <div
@@ -891,7 +1065,7 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
                           width: `${totalProgressCapped}%`,
                           height: '100%',
                           background: `linear-gradient(90deg, ${weight.color}60, ${weight.color})`,
-                          borderRadius: '2px',
+                          borderRadius: '1.5px',
                           transition: 'width 0.3s ease'
                         }}
                       />
@@ -944,6 +1118,24 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Estilos CSS para animação */}
+      <style>{`
+        @keyframes pulse {
+          0% {
+            transform: scale(1);
+            box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
+          }
+          50% {
+            transform: scale(1.1);
+            box-shadow: 0 2px 8px rgba(220, 38, 38, 0.5);
+          }
+          100% {
+            transform: scale(1);
+            box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
+          }
+        }
+      `}</style>
     </div>
   );
 };
