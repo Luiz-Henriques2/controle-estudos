@@ -354,7 +354,104 @@ export class StudyControlDB extends Dexie {
       return { error: error.message };
     }
   }
+
+/**
+   * Retorna todos os registros mensais para cálculo de estatísticas globais
+   */
+  async getAllHistory(): Promise<MonthlyData[]> {
+    try {
+      // CORREÇÃO: Acessa a tabela diretamente via 'this.monthlyData'
+      // e usa o método do Dexie '.toArray()' para pegar tudo.
+      return await this.monthlyData.toArray();
+    } catch (error) {
+      console.error('Erro ao buscar histórico completo:', error);
+      return [];
+    }
+  }
+
+// Adicione dentro da classe/objeto Database
+async calculateCurrentStreak(activityName: string, fromDate: Date = new Date()): Promise<number> {
+  let streak = 0;
+  let checkDate = new Date(fromDate);
+  
+  // Normalizar para garantir que não haja problemas com horas
+  checkDate.setHours(0, 0, 0, 0);
+
+  // Variáveis para cache do mês carregado (para não buscar o mesmo mês 30 vezes)
+  let loadedYear = -1;
+  let loadedMonth = -1;
+  let currentMonthData: any = null;
+
+  while (true) {
+    const year = checkDate.getFullYear();
+    const month = checkDate.getMonth() + 1;
+    const day = checkDate.getDate();
+
+    // Se mudou o mês em relação à iteração anterior, carrega o novo mês do banco
+    if (year !== loadedYear || month !== loadedMonth) {
+      try {
+        currentMonthData = await this.getMonthlyData(year, month);
+        loadedYear = year;
+        loadedMonth = month;
+      } catch (e) {
+        // Se der erro ou não existir o mês (ex: antes de começar a usar o app), paramos
+        break;
+      }
+    }
+
+    // Se não tem dados para este mês, a ofensiva acabou
+    if (!currentMonthData || !currentMonthData.entries) {
+      break;
+    }
+
+    // Busca a entrada do dia específico
+    const entry = currentMonthData.entries.find((e: any) => {
+      // Assumindo que e.date é um objeto Date ou string convertível
+      const d = new Date(e.date);
+      return d.getDate() === day;
+    });
+
+    const value = entry?.activities?.[activityName] || 0;
+    const MINIMUM_MINUTES = 0.5; // Defina seu critério mínimo aqui
+
+    if (value >= MINIMUM_MINUTES) {
+      streak++;
+      // Recua um dia no tempo
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      // Se falhou no dia "X":
+      // 1. Se "X" é a data de hoje (fromDate), a streak é 0 (ou mantemos a anterior se a regra for "até ontem").
+      // 2. Se "X" é um dia passado, a streak quebrou aqui.
+      
+      // Ajuste Fino: Se hoje eu ainda não fiz, mas fiz ontem, minha streak é válida?
+      // Geralmente apps mostram a streak acumulada até ontem + hoje se feito.
+      // Se for a primeira iteração (hoje) e for 0, não incrementamos, mas se a próxima (ontem) tiver, conta.
+      // Neste loop simples, se falhar, para.
+      
+      // Se for o PRÓPRIO dia de início (hoje) e não tiver feito, não quebra o loop imediatamente se quisermos contar "até ontem"?
+      // Para simplificar: Current Streak conta dias consecutivos FEITOS. Se hoje não fez, é 0? 
+      // Ou é a streak antiga? Geralmente "Current Streak" inclui hoje se feito. 
+      // Se não feito hoje, verifica se ontem foi feito.
+      
+      if (checkDate.getTime() === fromDate.getTime()) {
+         // Se é hoje e não fiz, apenas recuo para ver se mantenho a streak de ontem
+         checkDate.setDate(checkDate.getDate() - 1);
+         continue; 
+      }
+      
+      break; // Quebrou a sequência
+    }
+    
+    // Trava de segurança para loops infinitos (ex: 5 anos atrás)
+    if (streak > 2000) break; 
+  }
+
+  return streak;
 }
+}
+
+
+
 
 export const db = new StudyControlDB();
 

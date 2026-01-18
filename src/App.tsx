@@ -7,6 +7,10 @@ import './styles/global.css';
 function App() {
   const { isReady, error } = useDatabase();
   const [showWeightEditor, setShowWeightEditor] = useState(false);
+  
+  // ESTADO PARA FORÇAR ATUALIZAÇÃO DA LISTA
+  const [listVersion, setListVersion] = useState(0);
+
   const [currentDate, setCurrentDate] = useState(() => {
     const now = new Date();
     return {
@@ -19,6 +23,12 @@ function App() {
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
   ];
+
+  // FUNÇÃO PARA FECHAR E ATUALIZAR A PORRA DA LISTA
+  const handleCloseEditor = () => {
+    setShowWeightEditor(false);
+    setListVersion(prev => prev + 1); // Incrementa a versão para forçar re-render da tabela
+  };
 
   const handlePreviousMonth = () => {
     setCurrentDate(prev => {
@@ -38,13 +48,11 @@ function App() {
     });
   };
 
-  // Teste no console
   useEffect(() => {
     if (isReady) {
       console.log('✅ App: Banco está pronto!');
-      console.log('📅 Data atual:', currentDate);
     }
-  }, [isReady, currentDate]);
+  }, [isReady]);
 
   if (error) {
     return (
@@ -123,9 +131,10 @@ function App() {
             animation: 'slideUp 0.3s ease-out',
             position: 'relative'
           }}>
-            {/* Botão de Fechar */}
+            
+            {/* Botão de Fechar Superior */}
             <button
-              onClick={() => setShowWeightEditor(false)}
+              onClick={handleCloseEditor}
               style={{
                 position: 'absolute',
                 top: '30px',
@@ -139,21 +148,25 @@ function App() {
                 padding: '4px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                zIndex: 10
               }}
               onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
               onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
-              title="Fechar"
+              title="Fechar e atualizar"
             >
               ✕
             </button>
-            <WeightEditor onClose={() => setShowWeightEditor(false)} />
+
+            {/* Editor de Pesos/Atividades */}
+            <WeightEditor onClose={handleCloseEditor} />
           </div>
         </div>
       )}
 
-      {/* Tabela */}
+      {/* Tabela com KEY DINÂMICA (Muda a key = Atualiza os dados) */}
       <MonthlyTable
+        key={`${currentDate.year}-${currentDate.month}-${listVersion}`}
         year={currentDate.year}
         month={currentDate.month}
         currentMonth={currentDate}
@@ -161,7 +174,10 @@ function App() {
         onPreviousMonth={handlePreviousMonth}
         onNextMonth={handleNextMonth}
         showWeightEditor={showWeightEditor}
-        onToggleWeightEditor={() => setShowWeightEditor(!showWeightEditor)}
+        onToggleWeightEditor={() => {
+          if (showWeightEditor) handleCloseEditor();
+          else setShowWeightEditor(true);
+        }}
       />
 
       <style>{`

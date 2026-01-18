@@ -1,5 +1,8 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useMonthlyData } from '../../hooks/useMonthlyData';
+import { useActivityStreaks } from '../../hooks/useActivityStreaks'; // ✅ NOVO IMPORT
+import { ProgressChart } from './ProgressChart';
+import { MonthlyHistoryModal } from './MonthlyHistoryModal';
 
 interface MonthlyTableProps {
   year: number;
@@ -23,6 +26,13 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
   onToggleWeightEditor
 }) => {
   const { monthlyData, weights, updateDailyEntry, loading, error } = useMonthlyData(year, month);
+  
+  // ✅ USANDO O NOVO HOOK RECURSIVO
+  const { streaks: currentStreaks, loading: streaksLoading } = useActivityStreaks(year, month, weights);
+
+  const [showHistory, setShowHistory] = useState(false);
+  const [showChart, setShowChart] = useState(false);
+
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [scrollPosition, setScrollPosition] = useState(0);
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 0 });
@@ -37,115 +47,21 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
   const MAX_ROTATION = -40;
   const MAX_TRANSLATE_Z = 120;
   const MAX_BLUR = 0;
-  const MAX_SCALE = 1.1;
-  const MIN_SCALE = 0.85;
-  const MAX_OPACITY = 1;
-  const MIN_OPACITY = 0.3;
+  // const MAX_SCALE = 1.1; // Não utilizado diretamente, mas mantido ref original
+  // const MIN_SCALE = 0.85;
+  // const MAX_OPACITY = 1;
+  // const MIN_OPACITY = 0.3;
 
-  // Calcular sequências consecutivas para cada atividade - VERSÃO CORRIGIDA
-  const calculateStreaks = useCallback(() => {
-    const currentStreaks: Record<string, number> = {};
-    const maxStreaks: Record<string, number> = {};
-    
-    // Inicializar streaks
-    weights.forEach(weight => {
-      if (!weight.hidden) {
-        currentStreaks[weight.name] = 0;
-        maxStreaks[weight.name] = 0;
-      }
-    });
+  // ❌ REMOVIDO: calculateStreaks antigo foi deletado daqui.
 
-    // Verificar se monthlyData existe
-    if (!monthlyData || !monthlyData.entries) {
-      return {
-        current: currentStreaks,
-        max: maxStreaks
-      };
-    }
-
-    const today = new Date();
-    const isCurrentMonth = month === today.getMonth() + 1 && year === today.getFullYear();
-    const todayDay = isCurrentMonth ? today.getDate() : daysInMonth;
-
-    // Para cada atividade, calcular streaks independentemente
-    weights.forEach(weight => {
-      if (weight.hidden) return;
-      
-      const activityName = weight.name;
-      let currentStreak = 0;
-      let maxStreak = 0;
-      
-      // Calcular CURRENT STREAK (sequência atual até hoje)
-      // Começa verificando se HOJE foi feito
-      const todayEntry = monthlyData.entries.find((e: any) => {
-        if (!e.date) return false;
-        return e.date.getDate() === todayDay;
-      });
-      
-      const todayValue = todayEntry?.activities?.[activityName] || 0;
-      const MINIMUM_MINUTES = 0.5;
-      
-      if (todayValue >= MINIMUM_MINUTES) {
-        // Se HOJE foi feito, vamos contar dias consecutivos para trás
-        currentStreak = 1; // Começa com 1 porque hoje foi feito
-        
-        // Agora vai para trás até encontrar um dia que não foi feito
-        for (let day = todayDay - 1; day >= 1; day--) {
-          const entry = monthlyData.entries.find((e: any) => {
-            if (!e.date) return false;
-            return e.date.getDate() === day;
-          });
-          
-          const value = entry?.activities?.[activityName] || 0;
-          
-          if (value >= MINIMUM_MINUTES) {
-            currentStreak++; // Continua a sequência
-          } else {
-            break; // Encontrou um dia que não foi feito, para a contagem
-          }
-        }
-      }
-      // Se hoje NÃO foi feito, currentStreak permanece 0
-      
-      // Calcular MAX STREAK (maior sequência em qualquer período do mês)
-      let tempStreak = 0;
-      maxStreak = 0;
-      
-      for (let day = 1; day <= daysInMonth; day++) {
-        const entry = monthlyData.entries.find((e: any) => {
-          if (!e.date) return false;
-          return e.date.getDate() === day;
-        });
-        
-        const value = entry?.activities?.[activityName] || 0;
-        
-        if (value >= MINIMUM_MINUTES) {
-          tempStreak++;
-          maxStreak = Math.max(maxStreak, tempStreak);
-        } else {
-          tempStreak = 0; // Resetar para esta atividade
-        }
-      }
-      
-      // Atribuir os valores calculados
-      currentStreaks[activityName] = currentStreak;
-      maxStreaks[activityName] = maxStreak;
-    });
-
-    return {
-      current: currentStreaks,
-      max: maxStreaks
-    };
-  }, [monthlyData, weights, daysInMonth, year, month]);
-
-  // Função para atualizar entrada e recálcular streaks
+  // Função para atualizar entrada
   const handleUpdateEntry = async (day: number, activityName: string, activityValue: number) => {
     try {
       await updateDailyEntry(day, {
         activityName,
         activityValue
       });
-      // O hook useMonthlyData deve atualizar automaticamente os dados
+      // O hook useMonthlyData atualiza os dados, e useActivityStreaks vai recalcular em background
     } catch (error) {
       console.error('Erro ao atualizar:', error);
     }
@@ -373,9 +289,6 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
     return totalScore;
   };
 
-  // Calcular streaks
-  const streaks = calculateStreaks();
-
   if (loading) {
     return (
       <div style={{ 
@@ -533,6 +446,77 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
 
           {/* Botão de Atividades à direita */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+
+            {/* NOVO BOTÃO: GRÁFICO */}
+            <button
+              onClick={() => setShowChart(true)}
+              style={{
+                background: showChart ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                border: '1px solid',
+                borderColor: showChart ? 'rgba(59, 130, 246, 0.3)' : 'transparent',
+                cursor: 'pointer',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: '500',
+                color: showChart ? '#2563eb' : '#64748b',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              onMouseEnter={(e) => {
+                 if (!showChart) {
+                   e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
+                   e.currentTarget.style.color = '#2563eb';
+                 }
+              }}
+              onMouseLeave={(e) => {
+                 if (!showChart) {
+                   e.currentTarget.style.background = 'transparent';
+                   e.currentTarget.style.color = '#64748b';
+                 }
+              }}
+              title="Ver Progresso"
+            >
+              📊
+            </button>
+
+{/* BOTÃO HISTÓRICO MENSAL */}
+            <button
+              onClick={() => setShowHistory(true)}
+              style={{
+                background: showHistory ? 'rgba(245, 158, 11, 0.15)' : 'transparent',
+                border: '1px solid',
+                borderColor: showHistory ? 'rgba(245, 158, 11, 0.3)' : 'transparent',
+                cursor: 'pointer',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: '500',
+                color: showHistory ? '#d97706' : '#64748b',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              onMouseEnter={(e) => {
+                 if (!showHistory) {
+                   e.currentTarget.style.background = 'rgba(245, 158, 11, 0.1)';
+                   e.currentTarget.style.color = '#d97706';
+                 }
+              }}
+              onMouseLeave={(e) => {
+                 if (!showHistory) {
+                   e.currentTarget.style.background = 'transparent';
+                   e.currentTarget.style.color = '#64748b';
+                 }
+              }}
+              title="Histórico de Meses"
+            >
+              📅
+            </button>
+
             {onToggleWeightEditor && (
               <button
                 onClick={onToggleWeightEditor}
@@ -1058,8 +1042,8 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
                     </div>
                   </div>
                   
-                  {/* Ofensiva (foguinho) - CORRIGIDO */}
-                  {streaks.current[weight.name] > 0 ? (
+                  {/* Ofensiva (foguinho) - ATUALIZADO COM HOOK RECURSIVO */}
+                  {currentStreaks && currentStreaks[weight.name] > 0 ? (
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -1071,19 +1055,13 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
                       padding: '2px 6px',
                       borderRadius: '10px',
                       marginTop: '2px',
-                      animation: streaks.current[weight.name] >= 3 ? 'pulse 2s infinite' : 'none'
+                      animation: !streaksLoading && currentStreaks[weight.name] >= 3 ? 'pulse 2s infinite' : 'none',
+                      opacity: streaksLoading ? 0.5 : 1
                     }}>
                       <span>🔥</span>
-                      <span>{streaks.current[weight.name]} {streaks.current[weight.name] === 1 ? 'dia' : 'dias'}</span>
-                      {streaks.max[weight.name] > streaks.current[weight.name] && (
-                        <span style={{
-                          fontSize: '8px',
-                          color: '#9ca3af',
-                          marginLeft: '2px'
-                        }}>
-                          (max: {streaks.max[weight.name]})
-                        </span>
-                      )}
+                      <span>
+                        {currentStreaks[weight.name]} {currentStreaks[weight.name] === 1 ? 'dia' : 'dias'}
+                      </span>
                     </div>
                   ) : (
                     <div style={{
@@ -1092,7 +1070,7 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
                       padding: '2px 6px',
                       marginTop: '2px'
                     }}>
-                      —
+                      {streaksLoading ? '...' : '—'}
                     </div>
                   )}
                   
@@ -1185,6 +1163,25 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
           </div>
         </div>
       </div>
+
+      {/* RENDERIZAÇÃO DO MODAL DO GRÁFICO */}
+      {showChart && (
+        <ProgressChart
+          year={year}
+          month={month}
+          daysInMonth={daysInMonth}
+          data={monthlyData?.entries || []}
+          weights={weights}
+          onClose={() => setShowChart(false)}
+        />
+      )}
+
+{showHistory && (
+        <MonthlyHistoryModal
+          weights={weights}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
 
       {/* Estilos CSS para animação */}
       <style>{`
