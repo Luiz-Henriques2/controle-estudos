@@ -34,9 +34,9 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
   const PADDING_DAYS = 2;
 
   // Configurações do efeito 3D
-  const MAX_ROTATION = 30;
-  const MAX_TRANSLATE_Z = 60;
-  const MAX_BLUR = 4;
+  const MAX_ROTATION = -40;
+  const MAX_TRANSLATE_Z = 120;
+  const MAX_BLUR = 0;
   const MAX_SCALE = 1.1;
   const MIN_SCALE = 0.85;
   const MAX_OPACITY = 1;
@@ -151,15 +151,82 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
     }
   };
 
-  // Centralizar scroll inicial
+// --- SCROLL FINAL COM DESATIVAÇÃO DE SNAP ---
   useEffect(() => {
-    if (scrollContainerRef.current) {
-      const today = new Date().getDate();
-      const centerScroll = (today - 3) * DAY_HEIGHT + DAY_HEIGHT * PADDING_DAYS;
-      const maxScroll = (daysInMonth * DAY_HEIGHT + DAY_HEIGHT * PADDING_DAYS * 2) - CONTAINER_HEIGHT;
-      scrollContainerRef.current.scrollTop = Math.max(0, Math.min(centerScroll, maxScroll));
+    // Só roda se: não está carregando e a ref existe
+    if (!loading && scrollContainerRef.current) {
+      const now = new Date();
+      // Verifica estritamente Ano e Mês
+      const isCurrentMonth = year === now.getFullYear() && month === (now.getMonth() + 1);
+
+      if (isCurrentMonth) {
+        // requestAnimationFrame para sincronizar com a renderização
+        requestAnimationFrame(() => {
+          // Pequeno delay para garantir que o layout existe
+          const timer = setTimeout(() => {
+            if (!scrollContainerRef.current) return;
+
+            const today = now.getDate();
+            
+            // --- CÁLCULO ---
+            // Índice do dia (0-based)
+            const dayIndex = today - 1;
+            
+            // Posição absoluta do topo do dia na lista
+            const dayTop = (dayIndex * DAY_HEIGHT) + (DAY_HEIGHT * PADDING_DAYS);
+            
+            // Centralização: (Topo do dia) - (Metade da tela) + (Metade da altura do dia)
+            const centerPosition = dayTop - (CONTAINER_HEIGHT / 2) + (DAY_HEIGHT / 2);
+
+            // Limites de scroll
+            const currentScrollHeight = scrollContainerRef.current.scrollHeight;
+            const maxScroll = currentScrollHeight - CONTAINER_HEIGHT;
+            const targetScroll = Math.max(0, Math.min(centerPosition, maxScroll));
+
+            // --- AÇÃO "CIRÚRGICA" ---
+            
+            // 1. DESLIGA O "IMÃ" (Scroll Snap) E A ANIMAÇÃO
+            // Isso impede que o CSS lute contra o JS
+            scrollContainerRef.current.style.scrollSnapType = 'none';
+            scrollContainerRef.current.style.scrollBehavior = 'auto';
+            
+            // 2. MOVE PARA O LUGAR EXATO
+            scrollContainerRef.current.scrollTop = targetScroll;
+
+            // 3. REATIVA O SISTEMA
+            // Espera 100ms para garantir que o navegador aceitou a nova posição
+            setTimeout(() => {
+              if (scrollContainerRef.current) {
+                // Checagem final de posição
+                if (Math.abs(scrollContainerRef.current.scrollTop - targetScroll) > 10) {
+                   scrollContainerRef.current.scrollTop = targetScroll;
+                }
+                
+                // Religa o Snap (o imã) e a suavidade para o usuário usar
+                scrollContainerRef.current.style.scrollSnapType = 'y mandatory';
+                scrollContainerRef.current.style.scrollBehavior = 'smooth';
+              }
+            }, 100);
+
+          }, 100);
+
+          return () => clearTimeout(timer);
+        });
+      } else {
+        // Reset para outros meses (Topo)
+        scrollContainerRef.current.style.scrollSnapType = 'none'; // Desliga snap para resetar rápido
+        scrollContainerRef.current.style.scrollBehavior = 'auto';
+        scrollContainerRef.current.scrollTop = 0;
+        
+        setTimeout(() => {
+           if (scrollContainerRef.current) {
+             scrollContainerRef.current.style.scrollSnapType = 'y mandatory'; // Religa
+             scrollContainerRef.current.style.scrollBehavior = 'smooth';
+           }
+        }, 100);
+      }
     }
-  }, [daysInMonth]);
+  }, [loading, daysInMonth, year, month]);
 
   // Atualizar posição do scroll
   const handleScroll = useCallback(() => {
