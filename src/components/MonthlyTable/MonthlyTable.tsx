@@ -47,10 +47,10 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
   const MAX_ROTATION = -40;
   const MAX_TRANSLATE_Z = 120;
   const MAX_BLUR = 0;
-  // const MAX_SCALE = 1.1; // Não utilizado diretamente, mas mantido ref original
-  // const MIN_SCALE = 0.85;
-  // const MAX_OPACITY = 1;
-  // const MIN_OPACITY = 0.3;
+  const MAX_OPACITY = 0.7;
+  const MAX_BRIGHTNESS = 0.3;
+  const MAX_SCALE = 0.15; 
+
 
   // ❌ REMOVIDO: calculateStreaks antigo foi deletado daqui.
 
@@ -164,10 +164,10 @@ console.log('MonthlyTable estado:', {
     // Efeitos baseados na distância do centro
     const rotation = normalizedDistance * MAX_ROTATION;
     const translateZ = -Math.abs(normalizedDistance) * MAX_TRANSLATE_Z;
-    const scale = 1 - Math.abs(normalizedDistance) * 0.15;
+    const scale = 1 - Math.abs(normalizedDistance) * MAX_SCALE;
     const blur = Math.abs(normalizedDistance) * MAX_BLUR;
-    const opacity = 1 - Math.abs(normalizedDistance) * 0.7;
-    const brightness = 1 - Math.abs(normalizedDistance) * 0.3;
+    const opacity = 1 - Math.abs(normalizedDistance) * MAX_OPACITY;
+    const brightness = 1 - Math.abs(normalizedDistance) * MAX_BRIGHTNESS;
     
     return {
       transform: `perspective(1200px) rotateX(${rotation}deg) translateZ(${translateZ}px) scale(${scale})`,
