@@ -7,9 +7,10 @@ import './styles/global.css';
 function App() {
   const { isReady, error } = useDatabase();
   const [showWeightEditor, setShowWeightEditor] = useState(false);
-  
-  // ESTADO PARA FORÇAR ATUALIZAÇÃO DA LISTA
   const [listVersion, setListVersion] = useState(0);
+  
+  // ESTADO PARA CONTROLAR QUANDO MOSTRAR A TABELA
+  const [showTable, setShowTable] = useState(false);
 
   const [currentDate, setCurrentDate] = useState(() => {
     const now = new Date();
@@ -24,10 +25,10 @@ function App() {
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
   ];
 
-  // FUNÇÃO PARA FECHAR E ATUALIZAR A PORRA DA LISTA
+  // FUNÇÃO PARA FECHAR E ATUALIZAR
   const handleCloseEditor = () => {
     setShowWeightEditor(false);
-    setListVersion(prev => prev + 1); // Incrementa a versão para forçar re-render da tabela
+    setListVersion(prev => prev + 1);
   };
 
   const handlePreviousMonth = () => {
@@ -51,6 +52,15 @@ function App() {
   useEffect(() => {
     if (isReady) {
       console.log('✅ App: Banco está pronto!');
+      
+      // **ESPERA 600ms** para garantir TUDO está carregado
+      // Inclui banco de dados, hooks internos, etc.
+      const timer = setTimeout(() => {
+        console.log('🎯 App: Mostrando tabela...');
+        setShowTable(true);
+      }, 600); // Aumentei para 600ms para ser mais seguro
+      
+      return () => clearTimeout(timer);
     }
   }, [isReady]);
 
@@ -77,17 +87,41 @@ function App() {
     );
   }
 
-  if (!isReady) {
+  // Loading inicial
+  if (!isReady || !showTable) {
     return (
       <div style={{ 
         display: 'flex', 
         justifyContent: 'center', 
         alignItems: 'center', 
         height: '100vh',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        background: '#f8f9fa'
       }}>
-        <div className="spinner"></div>
-        <p style={{ marginTop: '20px' }}>Inicializando banco de dados...</p>
+        <div className="spinner" style={{
+          width: '50px',
+          height: '50px',
+          border: '4px solid #e2e8f0',
+          borderTopColor: '#3b82f6',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite',
+          marginBottom: '20px'
+        }}></div>
+        
+        <p style={{ 
+          marginTop: '20px', 
+          fontSize: '16px',
+          color: '#64748b',
+          fontWeight: '500'
+        }}>
+          {!isReady ? 'Inicializando banco de dados...' : 'Preparando visualização...'}
+        </p>
+        
+        <style>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
     );
   }
@@ -131,8 +165,6 @@ function App() {
             animation: 'slideUp 0.3s ease-out',
             position: 'relative'
           }}>
-            
-            {/* Botão de Fechar Superior */}
             <button
               onClick={handleCloseEditor}
               style={{
@@ -157,16 +189,14 @@ function App() {
             >
               ✕
             </button>
-
-            {/* Editor de Pesos/Atividades */}
             <WeightEditor onClose={handleCloseEditor} />
           </div>
         </div>
       )}
 
-      {/* Tabela com KEY DINÂMICA (Muda a key = Atualiza os dados) */}
+      {/* Tabela - AGORA com uma chave única que força recriação completa */}
       <MonthlyTable
-        key={`${currentDate.year}-${currentDate.month}-${listVersion}`}
+        key={`${currentDate.year}-${currentDate.month}-${listVersion}-${Date.now()}`}
         year={currentDate.year}
         month={currentDate.month}
         currentMonth={currentDate}

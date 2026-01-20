@@ -67,82 +67,76 @@ export const MonthlyTable: React.FC<MonthlyTableProps> = ({
     }
   };
 
-// --- SCROLL FINAL COM DESATIVAÇÃO DE SNAP ---
-  useEffect(() => {
-    // Só roda se: não está carregando e a ref existe
-    if (!loading && scrollContainerRef.current) {
-      const now = new Date();
-      // Verifica estritamente Ano e Mês
-      const isCurrentMonth = year === now.getFullYear() && month === (now.getMonth() + 1);
 
-      if (isCurrentMonth) {
-        // requestAnimationFrame para sincronizar com a renderização
-        requestAnimationFrame(() => {
-          // Pequeno delay para garantir que o layout existe
-          const timer = setTimeout(() => {
-            if (!scrollContainerRef.current) return;
+// Adicione este estado no início do MonthlyTable:
+const [initialRenderComplete, setInitialRenderComplete] = useState(false);
 
-            const today = now.getDate();
-            
-            // --- CÁLCULO ---
-            // Índice do dia (0-based)
-            const dayIndex = today - 1;
-            
-            // Posição absoluta do topo do dia na lista
-            const dayTop = (dayIndex * DAY_HEIGHT) + (DAY_HEIGHT * PADDING_DAYS);
-            
-            // Centralização: (Topo do dia) - (Metade da tela) + (Metade da altura do dia)
-            const centerPosition = dayTop - (CONTAINER_HEIGHT / 2) + (DAY_HEIGHT / 2);
-
-            // Limites de scroll
-            const currentScrollHeight = scrollContainerRef.current.scrollHeight;
-            const maxScroll = currentScrollHeight - CONTAINER_HEIGHT;
-            const targetScroll = Math.max(0, Math.min(centerPosition, maxScroll));
-
-            // --- AÇÃO "CIRÚRGICA" ---
-            
-            // 1. DESLIGA O "IMÃ" (Scroll Snap) E A ANIMAÇÃO
-            // Isso impede que o CSS lute contra o JS
-            scrollContainerRef.current.style.scrollSnapType = 'none';
-            scrollContainerRef.current.style.scrollBehavior = 'auto';
-            
-            // 2. MOVE PARA O LUGAR EXATO
+// Modifique o useEffect de scroll para algo mais agressivo:
+useEffect(() => {
+  const scrollToToday = () => {
+    if (!scrollContainerRef.current) return;
+    
+    const now = new Date();
+    const isCurrentMonth = year === now.getFullYear() && month === (now.getMonth() + 1);
+    
+    if (isCurrentMonth) {
+      const today = now.getDate();
+      const dayIndex = today - 1;
+      const dayTop = (dayIndex * DAY_HEIGHT) + (DAY_HEIGHT * PADDING_DAYS);
+      const centerPosition = dayTop - (CONTAINER_HEIGHT / 2) + (DAY_HEIGHT / 2);
+      
+      const currentScrollHeight = scrollContainerRef.current.scrollHeight;
+      const maxScroll = currentScrollHeight - CONTAINER_HEIGHT;
+      const targetScroll = Math.max(0, Math.min(centerPosition, maxScroll));
+      
+      // TENTATIVA 1: Scroll imediato
+      scrollContainerRef.current.style.scrollSnapType = 'none';
+      scrollContainerRef.current.style.scrollBehavior = 'auto';
+      scrollContainerRef.current.scrollTop = targetScroll;
+      
+      // TENTATIVA 2: Após 100ms (garantir renderização)
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = targetScroll;
+        }
+      }, 100);
+      
+      // TENTATIVA 3: Após 300ms (última tentativa)
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          const currentScroll = scrollContainerRef.current.scrollTop;
+          if (Math.abs(currentScroll - targetScroll) > 10) {
             scrollContainerRef.current.scrollTop = targetScroll;
-
-            // 3. REATIVA O SISTEMA
-            // Espera 100ms para garantir que o navegador aceitou a nova posição
-            setTimeout(() => {
-              if (scrollContainerRef.current) {
-                // Checagem final de posição
-                if (Math.abs(scrollContainerRef.current.scrollTop - targetScroll) > 10) {
-                   scrollContainerRef.current.scrollTop = targetScroll;
-                }
-                
-                // Religa o Snap (o imã) e a suavidade para o usuário usar
-                scrollContainerRef.current.style.scrollSnapType = 'y mandatory';
-                scrollContainerRef.current.style.scrollBehavior = 'smooth';
-              }
-            }, 100);
-
-          }, 100);
-
-          return () => clearTimeout(timer);
-        });
-      } else {
-        // Reset para outros meses (Topo)
-        scrollContainerRef.current.style.scrollSnapType = 'none'; // Desliga snap para resetar rápido
-        scrollContainerRef.current.style.scrollBehavior = 'auto';
-        scrollContainerRef.current.scrollTop = 0;
-        
-        setTimeout(() => {
-           if (scrollContainerRef.current) {
-             scrollContainerRef.current.style.scrollSnapType = 'y mandatory'; // Religa
-             scrollContainerRef.current.style.scrollBehavior = 'smooth';
-           }
-        }, 100);
-      }
+          }
+          
+          // Restaura configurações normais
+          scrollContainerRef.current.style.scrollSnapType = 'y mandatory';
+          scrollContainerRef.current.style.scrollBehavior = 'smooth';
+          
+          // Marca como completo
+          setInitialRenderComplete(true);
+        }
+      }, 300);
     }
-  }, [loading, daysInMonth, year, month]);
+  };
+  
+  // Só tenta fazer scroll quando NÃO estiver loading e já tiver dados
+  if (!loading && monthlyData && !initialRenderComplete) {
+    console.log('📋 MonthlyTable: Tentando scroll inicial...');
+    scrollToToday();
+  }
+}, [loading, monthlyData, year, month, initialRenderComplete]);
+
+// Adicione um log para debug:
+console.log('MonthlyTable estado:', {
+  loading,
+  hasMonthlyData: !!monthlyData,
+  year,
+  month,
+  initialRenderComplete,
+  scrollRefExists: !!scrollContainerRef.current
+});
+
 
   // Atualizar posição do scroll
   const handleScroll = useCallback(() => {
